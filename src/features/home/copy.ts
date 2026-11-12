@@ -13,6 +13,7 @@ const en = {
   loading: 'Loading matches',
   wonResult: '{team} won {margin}',
   vs: 'vs',
+  rematch: 'Rematch',
 } as const;
 
 export type HomeCopyKey = keyof typeof en;

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/theme/useTheme';
 import { useT } from '../src/i18n/useT';
@@ -39,21 +38,19 @@ export function HomeScreen({ checkResumable = defaultCheck }: HomeScreenProps) {
   }, [checkResumable]);
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing.xl, paddingVertical: spacing.lg }}>
-        <HomeHero />
-        {canResume ? (
-          <Surface elevation="medium" testID="resume-card">
-            <Text variant="heading">{t('resume')}</Text>
-            <Text variant="body" color="textSecondary" style={{ marginBottom: spacing.md }}>
-              {homeCopy('resumeSub', lang)}
-            </Text>
-            <TapButton label={t('resume')} onPress={() => router.push('/match/score')} haptic="medium" />
-          </Surface>
-        ) : null}
-        <TapButton label={t('newMatch')} onPress={() => router.push('/match/setup')} haptic="medium" />
-        <TapButton variant="secondary" label={homeCopy('matches', lang)} onPress={() => router.push('/matches')} />
-      </ScrollView>
+    <Screen style={{ gap: spacing.xl }}>
+      <HomeHero />
+      {canResume ? (
+        <Surface elevation="medium" testID="resume-card">
+          <Text variant="heading">{t('resume')}</Text>
+          <Text variant="body" color="textSecondary" style={{ marginBottom: spacing.md }}>
+            {homeCopy('resumeSub', lang)}
+          </Text>
+          <TapButton label={t('resume')} onPress={() => router.push('/match/score')} haptic="medium" />
+        </Surface>
+      ) : null}
+      <TapButton label={t('newMatch')} onPress={() => router.push('/match/setup')} haptic="medium" />
+      <TapButton variant="secondary" label={homeCopy('matches', lang)} onPress={() => router.push('/matches')} />
     </Screen>
   );
 }

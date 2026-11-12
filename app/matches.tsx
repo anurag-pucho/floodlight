@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/theme/useTheme';
 import { useT } from '../src/i18n/useT';
 import { Screen } from '../src/components/Screen';
+import { ScreenHeader } from '../src/components/ScreenHeader';
 import { Text } from '../src/components/Text';
 import { matchResult } from '../src/engine';
+import { matchStore } from '../src/store/matchStore';
+import { rematchConfig } from '../src/features/home/rematch';
 import type { MatchRepo } from '../src/db/types';
 import { EmptyState } from '../src/features/home/EmptyState';
 import { MatchListItem, type MatchListEntry } from '../src/features/home/MatchListItem';
@@ -38,9 +41,9 @@ export async function loadSavedMatches(repo?: MatchRepo, lang: Lang = 'en'): Pro
       if (!state) return { summary, result: null };
       const res = matchResult(state);
       if (!res.decided) return { summary, result: null };
-      if (res.tie || !res.winner) return { summary, result: translate(lang, 'tied') };
+      if (res.tie || !res.winner) return { summary, result: translate(lang, 'tied'), config: state.config };
       const team = res.winner === 'A' ? summary.teamAName : summary.teamBName;
-      return { summary, result: fill(homeCopy('wonResult', lang), { team, margin: res.margin ?? '' }) };
+      return { summary, result: fill(homeCopy('wonResult', lang), { team, margin: res.margin ?? '' }), config: state.config };
     }),
   );
 }
@@ -66,30 +69,32 @@ export function MatchesScreen({ load }: { load?: MatchesLoader }) {
   }, [load, lang]);
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.lg }}>
-        <View style={{ gap: spacing.xs }}>
-          <Text variant="display">{homeCopy('matches', lang)}</Text>
-          <Text variant="body" color="textSecondary">
-            {homeCopy('matchesSub', lang)}
-          </Text>
-        </View>
-        {entries === null ? (
-          <Text variant="caption" color="textSecondary">
-            {homeCopy('loading', lang)}
-          </Text>
-        ) : entries.length === 0 ? (
-          <EmptyState onNewMatch={() => router.push('/match/setup')} />
-        ) : (
-          entries.map((entry) => (
-            <MatchListItem
-              key={entry.summary.id}
-              entry={entry}
-              onPress={(id) => router.push({ pathname: '/match/scorecard', params: { id } })}
-            />
+    <Screen header={<ScreenHeader showHome={false} />} style={{ gap: spacing.lg }}>
+      <View style={{ gap: spacing.xs }}>
+        <Text variant="display">{homeCopy('matches', lang)}</Text>
+        <Text variant="body" color="textSecondary">
+          {homeCopy('matchesSub', lang)}
+        </Text>
+      </View>
+      {entries === null ? (
+        <Text variant="caption" color="textSecondary">
+          {homeCopy('loading', lang)}
+        </Text>
+      ) : entries.length === 0 ? (
+        <EmptyState onNewMatch={() => router.push('/match/setup')} />
+      ) : (
+        entries.map((entry) => (
+          <MatchListItem
+            key={entry.summary.id}
+            entry={entry}
+            onPress={(id) => router.push({ pathname: '/match/scorecard', params: { id } })}
+            onRematch={(config) => {
+              matchStore.getState().newMatch(rematchConfig(config));
+              router.push('/match/score');
+            }}
+          />
           ))
         )}
-      </ScrollView>
     </Screen>
   );
 }
