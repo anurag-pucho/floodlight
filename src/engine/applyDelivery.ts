@@ -1,8 +1,6 @@
 import { BallRecord, DeliveryInput, MatchState } from './types';
 import { currentInningsIndex, isFreeHit, legalBallCount } from './select';
-import { isLegalDelivery, wicketAllowed } from './rules';
-
-const BALLS_PER_OVER = 6;
+import { BALLS_PER_OVER, isLegalDelivery, wicketAllowed } from './rules';
 
 export function applyDelivery(state: MatchState, input: DeliveryInput): MatchState {
   const extraType = input.extra?.type;
@@ -24,5 +22,5 @@ export function applyDelivery(state: MatchState, input: DeliveryInput): MatchSta
     overNumber: Math.floor(priorLegal / BALLS_PER_OVER),
     ballInOver: (priorLegal % BALLS_PER_OVER) + 1,
   };
-  return { config: state.config, events: [...state.events, record], redo: [] };
+  return { ...state, events: [...state.events, record], redo: [] };
 }

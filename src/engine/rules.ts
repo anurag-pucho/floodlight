@@ -1,5 +1,7 @@
 import { BallRecord, DeliveryInput, MatchRules, WicketType } from './types';
 
+export const BALLS_PER_OVER = 6;
+
 /** Runs that were physically run (decide strike rotation). */
 export function runsRun(d: DeliveryInput): number {
   const extra = d.extra;

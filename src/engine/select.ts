@@ -1,10 +1,8 @@
 import { BallRecord, MatchState } from './types';
-import { ballBowlerRuns, ballTotalRuns, runsRun } from './rules';
+import { BALLS_PER_OVER, ballBowlerRuns, ballTotalRuns, runsRun } from './rules';
 
-const BALLS_PER_OVER = 6;
-
-export function currentInningsIndex(_state: MatchState): 0 | 1 {
-  return 0;
+export function currentInningsIndex(state: MatchState): 0 | 1 {
+  return state.inningsPointer ?? 0;
 }
 
 export function inningsEvents(state: MatchState, inningsIndex: 0 | 1): BallRecord[] {
@@ -73,7 +71,10 @@ export function battingSquadSize(state: MatchState, inningsIndex: 0 | 1): number
 
 /** True when the current innings has ended (overs exhausted or all out). */
 export function isInningsComplete(state: MatchState): boolean {
-  const idx = currentInningsIndex(state);
+  return inningsComplete(state, currentInningsIndex(state));
+}
+
+export function inningsComplete(state: MatchState, idx: 0 | 1): boolean {
   const { oversPerInnings, lastManStands } = state.config.rules;
   if (legalBallCount(state, idx) >= oversPerInnings * BALLS_PER_OVER) return true;
   const squad = battingSquadSize(state, idx);
@@ -149,4 +150,46 @@ export function bowlerConceded(state: MatchState, bowlerId: string): number {
   return state.events
     .filter(e => e.bowlerId === bowlerId)
     .reduce((sum, e) => sum + ballBowlerRuns(e, state.config.rules), 0);
+}
+
+function battingSide(state: MatchState, inningsIndex: 0 | 1): 'A' | 'B' {
+  const first = state.config.battingFirst;
+  return inningsIndex === 0 ? first : first === 'A' ? 'B' : 'A';
+}
+
+/** Target for the chasing side: innings-0 total + 1, once innings 0 is complete. */
+export function target(state: MatchState): number | null {
+  return inningsComplete(state, 0) ? teamTotal(state, 0) + 1 : null;
+}
+
+export interface ChaseStatus { runsNeeded: number; ballsRemaining: number; requiredRunRate: number; }
+
+export function chaseStatus(state: MatchState): ChaseStatus | null {
+  const t = target(state);
+  if (t === null || currentInningsIndex(state) !== 1) return null;
+  const runsNeeded = Math.max(0, t - teamTotal(state, 1));
+  const ballsRemaining = Math.max(0, state.config.rules.oversPerInnings * BALLS_PER_OVER - legalBallCount(state, 1));
+  const requiredRunRate = ballsRemaining === 0 ? 0 : (runsNeeded * BALLS_PER_OVER) / ballsRemaining;
+  return { runsNeeded, ballsRemaining, requiredRunRate };
+}
+
+export interface MatchResult { decided: boolean; winner?: 'A' | 'B'; tie?: boolean; margin?: string; }
+
+export function matchResult(state: MatchState): MatchResult {
+  const t = target(state);
+  if (t === null || currentInningsIndex(state) !== 1) return { decided: false };
+  const chasing = teamTotal(state, 1);
+  if (chasing >= t) {
+    const { lastManStands } = state.config.rules;
+    const squad = battingSquadSize(state, 1);
+    const left = (lastManStands ? squad : squad - 1) - wicketsDown(state, 1);
+    return { decided: true, winner: battingSide(state, 1), margin: `by ${left} wickets` };
+  }
+  if (!inningsComplete(state, 1)) return { decided: false };
+  if (chasing === t - 1) return { decided: true, tie: true };
+  return { decided: true, winner: battingSide(state, 0), margin: `by ${t - 1 - chasing} runs` };
+}
+
+export function needsSuperOver(state: MatchState): boolean {
+  return matchResult(state).tie === true;
 }

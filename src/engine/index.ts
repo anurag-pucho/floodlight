@@ -1,5 +1,5 @@
 export * from './types';
-export { createMatch } from './createMatch';
+export { createMatch, startNextInnings } from './createMatch';
 export { applyDelivery } from './applyDelivery';
 export {
   legalBallsInCurrentOver,
@@ -16,5 +16,10 @@ export {
   battingSquadSize,
   isInningsComplete,
   fallOfWickets,
+  currentInningsIndex,
+  target,
+  chaseStatus,
+  matchResult,
+  needsSuperOver,
 } from './select';
-export type { TeamExtras, FallOfWicket } from './select';
+export type { TeamExtras, FallOfWicket, ChaseStatus, MatchResult } from './select';
