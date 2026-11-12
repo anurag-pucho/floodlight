@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, View, type LayoutChangeEvent } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../../prefs/haptic';
 import Svg, { Circle, Line } from 'react-native-svg';
 import { replayTo, teamTotal, wicketsDown } from '../../engine';
 import type { BallRecord, MatchState } from '../../engine';
@@ -124,7 +124,7 @@ export function Replay({ state, defaultOpen = false }: { state: MatchState; defa
     const id = setInterval(() => {
       setK((cur) => {
         const next = Math.min(total, cur + 1);
-        if (next !== cur) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+        if (next !== cur) haptic('light');
         if (next >= total) setPlaying(false);
         return next;
       });

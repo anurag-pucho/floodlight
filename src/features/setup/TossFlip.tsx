@@ -7,7 +7,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../../prefs/haptic';
 import { TapButton } from '../../components/TapButton';
 import { Text } from '../../components/Text';
 import { useTheme } from '../../theme/useTheme';
@@ -46,7 +46,7 @@ function ChoiceCard({ testID, label, caption, selected, accent, onPress }: Choic
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptic('light');
         onPress();
       }}
       style={{
@@ -136,7 +136,7 @@ export function TossFlip({
     angleRef.current = target;
     setFlipping(true);
     setLanded(null);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    haptic('medium');
     angle.value = withTiming(target, {
       duration: FLIP_MS,
       easing: Easing.out(Easing.cubic),
@@ -156,7 +156,7 @@ export function TossFlip({
     timer.current = setTimeout(() => {
       setFlipping(false);
       setLanded(heads ? 'heads' : 'tails');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      haptic('success');
     }, FLIP_MS);
   };
 
