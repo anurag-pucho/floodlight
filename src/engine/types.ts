@@ -40,6 +40,4 @@ export interface MatchState {
   config: MatchConfig;
   events: BallRecord[];
   redo: BallRecord[];
-  /** Serializable innings pointer; absent means innings 0. Set by startNextInnings. */
-  inningsPointer?: 0 | 1;
 }

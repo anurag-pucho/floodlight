@@ -2,7 +2,8 @@ import { BallRecord, MatchState } from './types';
 import { BALLS_PER_OVER, ballBowlerRuns, ballTotalRuns, runsRun } from './rules';
 
 export function currentInningsIndex(state: MatchState): 0 | 1 {
-  return state.inningsPointer ?? 0;
+  // Derived from the event log: innings 1 begins once innings 0 is complete.
+  return inningsComplete(state, 0) ? 1 : 0;
 }
 
 export function inningsEvents(state: MatchState, inningsIndex: 0 | 1): BallRecord[] {
@@ -71,10 +72,16 @@ export function battingSquadSize(state: MatchState, inningsIndex: 0 | 1): number
 
 /** True when the current innings has ended (overs exhausted or all out). */
 export function isInningsComplete(state: MatchState): boolean {
-  return inningsComplete(state, currentInningsIndex(state));
+  // Until a delivery of the chase is played, "the innings" is the one that just ended.
+  if (inningsEvents(state, 1).length === 0) return inningsComplete(state, 0);
+  return inningsComplete(state, 1);
 }
 
 export function inningsComplete(state: MatchState, idx: 0 | 1): boolean {
+  if (idx === 1) {
+    const t = target(state);
+    if (t !== null && teamTotal(state, 1) >= t) return true;
+  }
   const { oversPerInnings, lastManStands } = state.config.rules;
   if (legalBallCount(state, idx) >= oversPerInnings * BALLS_PER_OVER) return true;
   const squad = battingSquadSize(state, idx);
@@ -183,11 +190,11 @@ export function matchResult(state: MatchState): MatchResult {
     const { lastManStands } = state.config.rules;
     const squad = battingSquadSize(state, 1);
     const left = (lastManStands ? squad : squad - 1) - wicketsDown(state, 1);
-    return { decided: true, winner: battingSide(state, 1), margin: `by ${left} wickets` };
+    return { decided: true, winner: battingSide(state, 1), margin: `by ${left} ${left === 1 ? 'wicket' : 'wickets'}` };
   }
   if (!inningsComplete(state, 1)) return { decided: false };
   if (chasing === t - 1) return { decided: true, tie: true };
-  return { decided: true, winner: battingSide(state, 0), margin: `by ${t - 1 - chasing} runs` };
+  return { decided: true, winner: battingSide(state, 0), margin: `by ${t - 1 - chasing} ${t - 1 - chasing === 1 ? 'run' : 'runs'}` };
 }
 
 export function needsSuperOver(state: MatchState): boolean {
