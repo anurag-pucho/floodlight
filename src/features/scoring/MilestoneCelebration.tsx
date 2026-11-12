@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Line } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../../prefs/haptic';
 import { CricketBall } from '../../components/CricketBall';
 import { Text } from '../../components/Text';
 import { useTheme } from '../../theme/useTheme';
@@ -115,7 +115,7 @@ export function MilestoneCelebration({ kind, playerName, onDone }: MilestoneCele
   const fade = useSharedValue(0);
 
   useEffect(() => {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    haptic('success');
     progress.value = withTiming(1, { duration: 1100, easing: Easing.out(Easing.cubic) });
     pop.value = withSpring(1);
     fade.value = withTiming(1, { duration: 180 });

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../../prefs/haptic';
 import {
   batsmenAtCrease,
   battingCard,
@@ -503,9 +503,9 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
         if (found.length > 0) setMilestones((q) => [...q, ...found]);
       }
       // The single haptic for a confirmed ball (pad buttons are silent).
-      if (part.wicket) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      else if (part.runsBat === 4 || part.runsBat === 6) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (part.wicket) haptic('warning');
+      else if (part.runsBat === 4 || part.runsBat === 6) haptic('heavy');
+      else haptic('light');
       return true;
     },
     undo() {

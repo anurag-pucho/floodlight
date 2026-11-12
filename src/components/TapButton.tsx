@@ -1,6 +1,6 @@
 import { Pressable, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
+import { haptic as fireHaptic } from '../prefs/haptic';
 import { useTheme } from '../theme/useTheme';
 import { Text } from './Text';
 
@@ -16,12 +16,6 @@ export interface TapButtonProps {
   style?: StyleProp<ViewStyle>;
   testID?: string;
 }
-
-const impact = {
-  light: Haptics.ImpactFeedbackStyle.Light,
-  medium: Haptics.ImpactFeedbackStyle.Medium,
-  heavy: Haptics.ImpactFeedbackStyle.Heavy,
-} as const;
 
 export function TapButton({
   label,
@@ -55,7 +49,7 @@ export function TapButton({
         scale.value = withSpring(1, { damping: 12, stiffness: 260 });
       }}
       onPress={() => {
-        if (haptic !== 'none') void Haptics.impactAsync(impact[haptic]);
+        if (haptic !== 'none') fireHaptic(haptic);
         onPress();
       }}
     >

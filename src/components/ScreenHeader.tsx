@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { haptic } from '../prefs/haptic';
 import { ChevronLeft, Home } from 'lucide-react-native';
 import { useTheme } from '../theme/useTheme';
 import { useT } from '../i18n/useT';
@@ -36,7 +36,7 @@ export function ScreenHeader({ title, showBack = true, showHome = true, right }:
       accessibilityLabel={label}
       hitSlop={spacing.xs}
       onPress={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        haptic('light');
         onPress();
       }}
       style={{
