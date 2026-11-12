@@ -8,6 +8,7 @@ import { Text } from '../src/components/Text';
 import { TapButton } from '../src/components/TapButton';
 import { HomeHero } from '../src/features/home/HomeHero';
 import { homeCopy } from '../src/features/home/copy';
+import { statsCopy } from '../src/features/stats/copy';
 import { matchStore } from '../src/store/matchStore';
 
 export interface HomeScreenProps {
@@ -51,6 +52,7 @@ export function HomeScreen({ checkResumable = defaultCheck }: HomeScreenProps) {
       ) : null}
       <TapButton label={t('newMatch')} onPress={() => router.push('/match/setup')} haptic="medium" />
       <TapButton variant="secondary" label={homeCopy('matches', lang)} onPress={() => router.push('/matches')} />
+      <TapButton variant="secondary" label={statsCopy('stats', lang)} onPress={() => router.push('/stats')} />
     </Screen>
   );
 }
