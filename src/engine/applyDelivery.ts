@@ -16,6 +16,7 @@ export function buildRecord(state: MatchState, input: DeliveryInput, id: string)
   return {
     ...rest,
     ...(wicket && wicketAllowed(wicket.type, input, freeHit) ? { wicket } : {}),
+    ...(wicket ? { enteredWicket: wicket } : {}),
     id,
     inningsIndex,
     legal,

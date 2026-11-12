@@ -3,8 +3,12 @@ import { buildRecord } from './applyDelivery';
 
 /** Strip the positional (derived) fields, keeping only what the scorer entered. */
 function toInput(r: BallRecord): DeliveryInput {
-  const { id: _id, inningsIndex: _i, legal: _l, freeHit: _f, overNumber: _o, ballInOver: _b, ...input } = r;
-  return input;
+  const {
+    id: _id, inningsIndex: _i, legal: _l, freeHit: _f, overNumber: _o, ballInOver: _b,
+    enteredWicket, wicket, ...input
+  } = r;
+  const raw = enteredWicket ?? wicket;
+  return raw ? { ...input, wicket: raw } : input;
 }
 
 /**

@@ -75,6 +75,12 @@ describe('undo / redo', () => {
     const u = undo(w);
     expect(wicketsDown(u, 0)).toBe(0);
     expect(batsmenAtCrease(u)).toEqual(batsmenAtCrease(afterFh));
+    expect(isFreeHit(u)).toBe(isFreeHit(afterFh));
+    const r = redo(u);
+    expect(r.events).toEqual(w.events);
+    expect(wicketsDown(r, 0)).toBe(1);
+    expect(batsmenAtCrease(r)).toEqual(batsmenAtCrease(w));
+    expect(isFreeHit(r)).toBe(isFreeHit(w));
   });
 
   it('undo of the first ball of innings 1 returns to innings-0-complete state', () => {
@@ -120,6 +126,8 @@ describe('editBall', () => {
     expect(last.ballInOver).toBe(6);
     expect(legalBallsInCurrentOver(e)).toBe(0);
     expect(teamTotal(e, 0)).toBe(1);
+    expect(onStrikeId(e)).toBe(batsmenAtCrease(e).strikerId);
+    expect(batsmenAtCrease(e)).not.toEqual(batsmenAtCrease(s));
     expect(e.events.map(x => x.id)).toEqual(s.events.map(x => x.id));
     expect(e.redo).toEqual([]);
   });
@@ -130,6 +138,29 @@ describe('editBall', () => {
     const e = editBall(s, s.events[0].id, ball(4));
     expect(e.redo).toEqual([]);
     expect(teamTotal(e, 0)).toBe(4);
+  });
+});
+
+describe('editBall preserves entered wicket', () => {
+  const nb = (): DeliveryInput => ({ ...ball(0), extra: { type: 'noball', runs: 0 } });
+  const bowled = (st: string, non: string): DeliveryInput => ({ ...ball(0, st, non), wicket: { type: 'bowled', outPlayerId: st } });
+
+  it('restores a dropped free-hit wicket when the no-ball is edited to a legal ball', () => {
+    let s = applyDelivery(createMatch(makeConfig()), nb());
+    s = applyDelivery(s, bowled(onStrikeId(s), onStrikeId(s) === 'a1' ? 'a2' : 'a1'));
+    expect(s.events[1].freeHit).toBe(true);
+    expect(wicketsDown(s, 0)).toBe(0);
+    const e = editBall(s, s.events[0].id, ball(0));
+    expect(wicketsDown(e, 0)).toBe(1);
+  });
+
+  it('re-drops a dismissal when a legal ball is edited into a no-ball', () => {
+    let s = applyDelivery(createMatch(makeConfig()), ball(0));
+    s = applyDelivery(s, bowled('a1', 'a2'));
+    expect(wicketsDown(s, 0)).toBe(1);
+    const e = editBall(s, s.events[0].id, nb());
+    expect(wicketsDown(e, 0)).toBe(0);
+    expect(e.events[1].enteredWicket).toBeDefined();
   });
 });
 

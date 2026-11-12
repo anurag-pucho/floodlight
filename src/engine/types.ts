@@ -20,13 +20,14 @@ export interface MatchConfig {
   rules: MatchRules;
   battingFirst: 'A' | 'B';
 }
+export interface Wicket { type: WicketType; outPlayerId: string; fielderId?: string }
 export interface DeliveryInput {
   strikerId: string;
   nonStrikerId: string;
   bowlerId: string;
   runsBat: number;
   extra?: { type: ExtraType; runs: number };
-  wicket?: { type: WicketType; outPlayerId: string; fielderId?: string };
+  wicket?: Wicket;
 }
 export interface BallRecord extends DeliveryInput {
   id: string;
@@ -35,6 +36,8 @@ export interface BallRecord extends DeliveryInput {
   freeHit: boolean;
   overNumber: number;
   ballInOver: number;
+  /** Raw wicket as entered; `wicket` is the effective one after rule filtering. */
+  enteredWicket?: Wicket;
 }
 export interface MatchState {
   config: MatchConfig;
