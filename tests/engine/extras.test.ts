@@ -39,14 +39,14 @@ describe('wides', () => {
     expect(s.events[0].legal).toBe(false);
     expect(teamTotal(s, 0)).toBe(1);
     expect(legalBallsInCurrentOver(s)).toBe(0);
-    expect(bowlerConceded(s, 'b1')).toBe(1);
+    expect(bowlerConceded(s, 'b1', 0)).toBe(1);
     expect(onStrikeId(s)).toBe('a1');
   });
 
   it('wide with 2 run adds 3 and does not rotate; with 1 run rotates', () => {
     const s2 = applyDelivery(start(), d({ extra: { type: 'wide', runs: 2 } }));
     expect(teamTotal(s2, 0)).toBe(3);
-    expect(bowlerConceded(s2, 'b1')).toBe(3);
+    expect(bowlerConceded(s2, 'b1', 0)).toBe(3);
     expect(onStrikeId(s2)).toBe('a1');
     const s1 = applyDelivery(start(), d({ extra: { type: 'wide', runs: 1 } }));
     expect(teamTotal(s1, 0)).toBe(2);
@@ -67,8 +67,8 @@ describe('no-balls and free hit', () => {
   it('no-ball with 4 off the bat: team +5, striker 4, not legal, free hit next', () => {
     let s = applyDelivery(start(), d({ runsBat: 4, extra: { type: 'noball', runs: 0 } }));
     expect(teamTotal(s, 0)).toBe(5);
-    expect(batterRuns(s, 'a1')).toBe(4);
-    expect(bowlerConceded(s, 'b1')).toBe(5);
+    expect(batterRuns(s, 'a1', 0)).toBe(4);
+    expect(bowlerConceded(s, 'b1', 0)).toBe(5);
     expect(s.events[0].legal).toBe(false);
     expect(s.events[0].freeHit).toBe(false);
     expect(legalBallsInCurrentOver(s)).toBe(0);
@@ -102,7 +102,7 @@ describe('no-balls and free hit', () => {
     let s = applyDelivery(start(), d({ extra: { type: 'noball', runs: 0 } }));
     s = applyDelivery(s, d({ runsBat: 2, wicket: { type: 'bowled', outPlayerId: 'a1' } }));
     expect(s.events[1].wicket).toBeUndefined();
-    expect(batterRuns(s, 'a1')).toBe(2);
+    expect(batterRuns(s, 'a1', 0)).toBe(2);
     expect(teamTotal(s, 0)).toBe(3);
 
     let r = applyDelivery(start(), d({ extra: { type: 'noball', runs: 0 } }));
@@ -123,8 +123,8 @@ describe('byes and leg-byes', () => {
     expect(legalBallsInCurrentOver(s)).toBe(1);
     expect(teamTotal(s, 0)).toBe(2);
     expect(teamExtras(s, 0).byes).toBe(2);
-    expect(batterRuns(s, 'a1')).toBe(0);
-    expect(bowlerConceded(s, 'b1')).toBe(0);
+    expect(batterRuns(s, 'a1', 0)).toBe(0);
+    expect(bowlerConceded(s, 'b1', 0)).toBe(0);
     expect(onStrikeId(s)).toBe('a1');
   });
 
@@ -132,8 +132,8 @@ describe('byes and leg-byes', () => {
     const s = applyDelivery(start(), d({ extra: { type: 'legbye', runs: 1 } }));
     expect(s.events[0].legal).toBe(true);
     expect(teamExtras(s, 0).legByes).toBe(1);
-    expect(batterRuns(s, 'a1')).toBe(0);
-    expect(bowlerConceded(s, 'b1')).toBe(0);
+    expect(batterRuns(s, 'a1', 0)).toBe(0);
+    expect(bowlerConceded(s, 'b1', 0)).toBe(0);
     expect(onStrikeId(s)).toBe('a2');
   });
 

@@ -60,9 +60,9 @@ export function wicketsDown(state: MatchState, inningsIndex: 0 | 1): number {
 }
 
 /** Wickets credited to a bowler (run-outs excluded). */
-export function bowlerWickets(state: MatchState, bowlerId: string, inningsIndex?: 0 | 1): number {
+export function bowlerWickets(state: MatchState, bowlerId: string, inningsIndex: 0 | 1): number {
   return state.events.filter(
-    e => e.bowlerId === bowlerId && (inningsIndex === undefined || e.inningsIndex === inningsIndex)
+    e => e.bowlerId === bowlerId && e.inningsIndex === inningsIndex
       && e.wicket && e.wicket.type !== 'runout',
   ).length;
 }
@@ -155,16 +155,16 @@ export function teamTotal(state: MatchState, inningsIndex: 0 | 1): number {
 }
 
 /** Runs credited to a batter (bat runs only, never byes/leg-byes/wides). */
-export function batterRuns(state: MatchState, batterId: string, inningsIndex?: 0 | 1): number {
+export function batterRuns(state: MatchState, batterId: string, inningsIndex: 0 | 1): number {
   return state.events
-    .filter(e => e.strikerId === batterId && (inningsIndex === undefined || e.inningsIndex === inningsIndex))
+    .filter(e => e.strikerId === batterId && e.inningsIndex === inningsIndex)
     .reduce((sum, e) => sum + e.runsBat, 0);
 }
 
 /** Runs conceded by a bowler (excludes byes and leg-byes). */
-export function bowlerConceded(state: MatchState, bowlerId: string, inningsIndex?: 0 | 1): number {
+export function bowlerConceded(state: MatchState, bowlerId: string, inningsIndex: 0 | 1): number {
   return state.events
-    .filter(e => e.bowlerId === bowlerId && (inningsIndex === undefined || e.inningsIndex === inningsIndex))
+    .filter(e => e.bowlerId === bowlerId && e.inningsIndex === inningsIndex)
     .reduce((sum, e) => sum + ballBowlerRuns(e, state.config.rules), 0);
 }
 

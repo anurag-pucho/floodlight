@@ -73,12 +73,12 @@ describe('shared player: bowling figures are per-innings', () => {
     s = applyDelivery(s, { strikerId: 'b1', nonStrikerId: 'b3', bowlerId: 'shared1', runsBat: 2 });
     s = applyDelivery(s, { strikerId: 'b1', nonStrikerId: 'b3', bowlerId: 'shared1', runsBat: 0, wicket: { type: 'bowled', outPlayerId: 'b1' } });
 
-    expect(bowlerConceded(s, 'shared1')).toBe(2);
+    expect(bowlerConceded(s, 'shared1', 1)).toBe(2);
     expect(bowlerConceded(s, 'shared1', 1)).toBe(2);
     expect(bowlerConceded(s, 'shared1', 0)).toBe(0);
-    expect(bowlerWickets(s, 'shared1')).toBe(1);
+    expect(bowlerWickets(s, 'shared1', 1)).toBe(1);
     expect(bowlerWickets(s, 'shared1', 0)).toBe(0);
-    expect(batterRuns(s, 'shared1')).toBe(3);
+    expect(batterRuns(s, 'shared1', 0)).toBe(3);
     expect(bowlerOversBowled(s, 'shared1', 0)).toBe(0);
     expect(bowlerOversBowled(s, 'shared1', 1)).toBe(0);
   });
@@ -94,7 +94,7 @@ describe('custom rule values', () => {
     expect(ex.noBalls).toBe(2);
     expect(ex.total).toBe(4);
     expect(teamTotal(s, 0)).toBe(5);
-    expect(bowlerConceded(s, 'b1')).toBe(5);
+    expect(bowlerConceded(s, 'b1', 0)).toBe(5);
   });
 });
 
@@ -114,5 +114,17 @@ describe('bowlerOversBowled', () => {
     s = play(s, ball('b1'), 3);
     expect(bowlerOversBowled(s, 'b1', 0)).toBe(2);
     expect(bowlerOversBowled(s, 'b1', 1)).toBe(0);
+  });
+});
+
+describe('shared player batting in both innings is never double-counted', () => {
+  it('batterRuns requires an innings and reports each separately', () => {
+    let s = createMatch(makeConfig());
+    s = applyDelivery(s, { strikerId: 'shared1', nonStrikerId: 'a1', bowlerId: 'b1', runsBat: 2 });
+    s = play(s, { strikerId: 'a1', nonStrikerId: 'a3', bowlerId: 'b1', runsBat: 0 }, 5);
+    s = startNextInnings(s);
+    s = applyDelivery(s, { strikerId: 'shared1', nonStrikerId: 'b1', bowlerId: 'a1', runsBat: 4 });
+    expect(batterRuns(s, 'shared1', 0)).toBe(2);
+    expect(batterRuns(s, 'shared1', 1)).toBe(4);
   });
 });

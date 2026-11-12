@@ -45,18 +45,18 @@ describe('wicket types', () => {
     const s = applyDelivery(start(), d({ wicket: { type: t, outPlayerId: 'a1' } }));
     expect(wicketsDown(s, 0)).toBe(1);
     expect(dismissedIds(s, 0).has('a1')).toBe(true);
-    expect(bowlerWickets(s, 'b1')).toBe(1);
+    expect(bowlerWickets(s, 'b1', 0)).toBe(1);
   });
   it('runout records a dismissal but does not credit the bowler', () => {
     const s = applyDelivery(start(), d({ wicket: { type: 'runout', outPlayerId: 'a2' } }));
     expect(wicketsDown(s, 0)).toBe(1);
     expect(dismissedIds(s, 0).has('a2')).toBe(true);
-    expect(bowlerWickets(s, 'b1')).toBe(0);
+    expect(bowlerWickets(s, 'b1', 0)).toBe(0);
   });
   it('runout with bat runs and byes completed still counts those runs', () => {
     const s1 = applyDelivery(start(), d({ runsBat: 1, wicket: { type: 'runout', outPlayerId: 'a2' } }));
     expect(teamTotal(s1, 0)).toBe(1);
-    expect(batterRuns(s1, 'a1')).toBe(1);
+    expect(batterRuns(s1, 'a1', 0)).toBe(1);
     const s2 = applyDelivery(start(), d({ extra: { type: 'bye', runs: 2 }, wicket: { type: 'runout', outPlayerId: 'a1' } }));
     expect(teamTotal(s2, 0)).toBe(2);
     expect(wicketsDown(s2, 0)).toBe(1);
