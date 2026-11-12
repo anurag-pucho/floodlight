@@ -13,6 +13,7 @@ export {
   dismissedIds,
   wicketsDown,
   bowlerWickets,
+  bowlerOversBowled,
   battingSquadSize,
   isInningsComplete,
   fallOfWickets,

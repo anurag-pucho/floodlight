@@ -60,8 +60,17 @@ export function wicketsDown(state: MatchState, inningsIndex: 0 | 1): number {
 }
 
 /** Wickets credited to a bowler (run-outs excluded). */
-export function bowlerWickets(state: MatchState, bowlerId: string): number {
-  return state.events.filter(e => e.bowlerId === bowlerId && e.wicket && e.wicket.type !== 'runout').length;
+export function bowlerWickets(state: MatchState, bowlerId: string, inningsIndex?: 0 | 1): number {
+  return state.events.filter(
+    e => e.bowlerId === bowlerId && (inningsIndex === undefined || e.inningsIndex === inningsIndex)
+      && e.wicket && e.wicket.type !== 'runout',
+  ).length;
+}
+
+/** Completed overs bowled by a bowler in an innings (legal balls only). */
+export function bowlerOversBowled(state: MatchState, bowlerId: string, inningsIndex: 0 | 1): number {
+  const legal = inningsEvents(state, inningsIndex).filter(e => e.bowlerId === bowlerId && e.legal).length;
+  return Math.floor(legal / BALLS_PER_OVER);
 }
 
 export function battingSquadSize(state: MatchState, inningsIndex: 0 | 1): number {
@@ -146,16 +155,16 @@ export function teamTotal(state: MatchState, inningsIndex: 0 | 1): number {
 }
 
 /** Runs credited to a batter (bat runs only, never byes/leg-byes/wides). */
-export function batterRuns(state: MatchState, batterId: string): number {
+export function batterRuns(state: MatchState, batterId: string, inningsIndex?: 0 | 1): number {
   return state.events
-    .filter(e => e.strikerId === batterId)
+    .filter(e => e.strikerId === batterId && (inningsIndex === undefined || e.inningsIndex === inningsIndex))
     .reduce((sum, e) => sum + e.runsBat, 0);
 }
 
 /** Runs conceded by a bowler (excludes byes and leg-byes). */
-export function bowlerConceded(state: MatchState, bowlerId: string): number {
+export function bowlerConceded(state: MatchState, bowlerId: string, inningsIndex?: 0 | 1): number {
   return state.events
-    .filter(e => e.bowlerId === bowlerId)
+    .filter(e => e.bowlerId === bowlerId && (inningsIndex === undefined || e.inningsIndex === inningsIndex))
     .reduce((sum, e) => sum + ballBowlerRuns(e, state.config.rules), 0);
 }
 
