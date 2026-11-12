@@ -209,3 +209,160 @@ export function matchResult(state: MatchState): MatchResult {
 export function needsSuperOver(state: MatchState): boolean {
   return matchResult(state).tie === true;
 }
+
+// ---------------------------------------------------------------------------
+// Derived scorecard stats (all pure folds over the event log)
+// ---------------------------------------------------------------------------
+
+export interface BattingRow {
+  playerId: string; runs: number; balls: number; fours: number; sixes: number;
+  strikeRate: number; out: boolean; dismissal?: string;
+}
+
+function playerName(state: MatchState, id: string): string {
+  return state.config.players[id]?.name ?? id;
+}
+
+function dismissalText(state: MatchState, e: BallRecord): string {
+  const w = e.wicket;
+  if (!w) return '';
+  const bowler = playerName(state, e.bowlerId);
+  const fielder = w.fielderId ? playerName(state, w.fielderId) : '';
+  switch (w.type) {
+    case 'bowled': return `b ${bowler}`;
+    case 'lbw': return `lbw b ${bowler}`;
+    case 'caught': return w.fielderId === e.bowlerId ? `c & b ${bowler}` : `c ${fielder} b ${bowler}`.replace('c  b', 'c b');
+    case 'stumped': return `st ${fielder} b ${bowler}`.replace('st  b', 'st b');
+    case 'hitwicket': return `hit wicket b ${bowler}`;
+    case 'runout': return fielder ? `run out (${fielder})` : 'run out';
+    case 'retired': return 'retired';
+  }
+}
+
+/** Batting card in order of appearance. Balls faced exclude wides, include no-balls. */
+export function battingCard(state: MatchState, inningsIndex: 0 | 1): BattingRow[] {
+  const events = inningsEvents(state, inningsIndex);
+  const order: string[] = [];
+  const seen = new Set<string>();
+  for (const e of events) {
+    for (const id of [e.strikerId, e.nonStrikerId]) {
+      if (id && !seen.has(id)) { seen.add(id); order.push(id); }
+    }
+  }
+  const dismissed = dismissedIds(state, inningsIndex);
+  return order.map(playerId => {
+    const faced = events.filter(e => e.strikerId === playerId && e.extra?.type !== 'wide');
+    const balls = faced.length;
+    const runs = batterRuns(state, playerId, inningsIndex);
+    const row: BattingRow = {
+      playerId,
+      runs,
+      balls,
+      fours: faced.filter(e => e.runsBat === 4).length,
+      sixes: faced.filter(e => e.runsBat === 6).length,
+      strikeRate: balls === 0 ? 0 : (runs / balls) * 100,
+      out: dismissed.has(playerId),
+    };
+    if (row.out) {
+      const outEvent = events.find(e => e.wicket?.outPlayerId === playerId);
+      if (outEvent) row.dismissal = dismissalText(state, outEvent);
+    }
+    return row;
+  });
+}
+
+export interface BowlingRow {
+  playerId: string; overs: string; maidens: number; runs: number; wickets: number;
+  economy: number; dots: number; wides: number; noBalls: number;
+}
+
+/** Bowling card in order first bowled. Maidens/dots use runs charged to the bowler (byes/leg-byes excluded). */
+export function bowlingCard(state: MatchState, inningsIndex: 0 | 1): BowlingRow[] {
+  const events = inningsEvents(state, inningsIndex);
+  const rules = state.config.rules;
+  const order: string[] = [];
+  for (const e of events) if (!order.includes(e.bowlerId)) order.push(e.bowlerId);
+  return order.map(playerId => {
+    const mine = events.filter(e => e.bowlerId === playerId);
+    const legal = mine.filter(e => e.legal).length;
+    const runs = bowlerConceded(state, playerId, inningsIndex);
+    const overs = new Map<number, { legal: number; charged: number }>();
+    for (const e of mine) {
+      const o = overs.get(e.overNumber) ?? { legal: 0, charged: 0 };
+      if (e.legal) o.legal += 1;
+      o.charged += ballBowlerRuns(e, rules);
+      overs.set(e.overNumber, o);
+    }
+    let maidens = 0;
+    overs.forEach(o => { if (o.legal === BALLS_PER_OVER && o.charged === 0) maidens += 1; });
+    return {
+      playerId,
+      overs: `${Math.floor(legal / BALLS_PER_OVER)}.${legal % BALLS_PER_OVER}`,
+      maidens,
+      runs,
+      wickets: bowlerWickets(state, playerId, inningsIndex),
+      economy: legal === 0 ? 0 : runs / (legal / BALLS_PER_OVER),
+      dots: mine.filter(e => e.legal && ballBowlerRuns(e, rules) === 0).length,
+      wides: mine.filter(e => e.extra?.type === 'wide').length,
+      noBalls: mine.filter(e => e.extra?.type === 'noball').length,
+    };
+  });
+}
+
+export interface Partnership { forWicket: number; runs: number; balls: number; playerIds: [string, string]; }
+
+/**
+ * Partnerships in order. Runs are team runs (incl. extras) scored while the pair was in,
+ * balls are legal deliveries; the wicket ball belongs to the partnership it ends.
+ * playerIds = [striker, non-striker] of the partnership's first delivery.
+ */
+export function partnerships(state: MatchState, inningsIndex: 0 | 1): Partnership[] {
+  const out: Partnership[] = [];
+  let cur: Partnership | null = null;
+  for (const e of inningsEvents(state, inningsIndex)) {
+    if (!cur) cur = { forWicket: out.length + 1, runs: 0, balls: 0, playerIds: [e.strikerId, e.nonStrikerId] };
+    cur.runs += ballTotalRuns(e, state.config.rules);
+    if (e.legal) cur.balls += 1;
+    if (e.wicket) { out.push(cur); cur = null; }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+/** One entry per over (including a partial last over); extras are attributed to the over they occur in. */
+export function manhattan(state: MatchState, inningsIndex: 0 | 1): { over: number; runs: number; wickets: number }[] {
+  const out: { over: number; runs: number; wickets: number }[] = [];
+  for (const e of inningsEvents(state, inningsIndex)) {
+    while (out.length <= e.overNumber) out.push({ over: out.length, runs: 0, wickets: 0 });
+    out[e.overNumber].runs += ballTotalRuns(e, state.config.rules);
+    if (e.wicket) out[e.overNumber].wickets += 1;
+  }
+  return out;
+}
+
+/**
+ * Cumulative team runs after each legal ball. Runs from non-legal balls are carried into the
+ * next legal ball's total; any trailing ones are folded into the last entry so it ends at the total.
+ */
+export function worm(state: MatchState, inningsIndex: 0 | 1): { ball: number; runs: number }[] {
+  const out: { ball: number; runs: number }[] = [];
+  let runs = 0;
+  let legal = 0;
+  let pending = false;
+  for (const e of inningsEvents(state, inningsIndex)) {
+    runs += ballTotalRuns(e, state.config.rules);
+    if (e.legal) { legal += 1; out.push({ ball: legal, runs }); pending = false; }
+    else pending = true;
+  }
+  if (pending) {
+    if (out.length > 0) out[out.length - 1].runs = runs;
+    else out.push({ ball: 0, runs });
+  }
+  return out;
+}
+
+/** Runs per over so far (0 before the first legal ball). */
+export function runRate(state: MatchState, inningsIndex: 0 | 1): number {
+  const legal = legalBallCount(state, inningsIndex);
+  return legal === 0 ? 0 : teamTotal(state, inningsIndex) / (legal / BALLS_PER_OVER);
+}
