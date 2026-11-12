@@ -53,6 +53,23 @@ test('delivery applies via engine and saves once after debounce', () => {
   expect(status).toBe('in_progress');
 });
 
+test('retire applies via engine and autosaves', () => {
+  const { repo, store } = make();
+  store.getState().newMatch(config);
+  store.getState().delivery({ ...inn0, runsBat: 1 });
+  jest.advanceTimersByTime(400);
+  (repo.saveMatch as jest.Mock).mockClear();
+  store.getState().retire({ playerId: 'a1', out: true });
+  expect(store.getState().state!.retires).toHaveLength(1);
+  expect(repo.saveMatch).not.toHaveBeenCalled();
+  jest.advanceTimersByTime(400);
+  expect(repo.saveMatch).toHaveBeenCalledTimes(1);
+  const [saved, status] = (repo.saveMatch as jest.Mock).mock.calls[0];
+  expect(saved).toBe(store.getState().state);
+  expect(saved.retires).toHaveLength(1);
+  expect(status).toBe('in_progress');
+});
+
 test('undo and redo revert and restore the last ball', () => {
   const { store } = make();
   store.getState().newMatch(config);

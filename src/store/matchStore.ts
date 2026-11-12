@@ -1,6 +1,7 @@
 import { createStore, useStore } from 'zustand';
 import {
   applyDelivery,
+  applyRetire,
   createMatch,
   currentInningsIndex,
   editBall as engineEditBall,
@@ -65,6 +66,7 @@ export function createMatchStore(options: MatchStoreOptions) {
         persist(s, 'in_progress');
       },
       delivery: (input) => mutate((s) => applyDelivery(s, input)),
+      retire: (input) => mutate((s) => applyRetire(s, input)),
       undo: () => mutate(engineUndo),
       redo: () => mutate(engineRedo),
       editBall: (ballId, input) => mutate((s) => engineEditBall(s, ballId, input)),

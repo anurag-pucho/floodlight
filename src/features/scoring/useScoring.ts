@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import * as Haptics from 'expo-haptics';
 import {
-  applyRetire,
   batsmenAtCrease,
   battingCard,
   bowlerOversBowled,
@@ -533,7 +532,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
       const cur = resolveLive(fresh, picks);
       if (cur.phase !== 'live' || cur.need !== null) return false;
       if (playerId !== cur.strikerId && playerId !== cur.nonId) return false;
-      store.setState({ state: applyRetire(fresh, { playerId, out: isOut }) });
+      store.getState().retire({ playerId, out: isOut });
       setBatterPick(null);
       return true;
     },

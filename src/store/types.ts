@@ -8,6 +8,7 @@ export interface MatchStoreState {
   state: MatchState | null;
   newMatch(config: MatchConfig): void;
   delivery(input: DeliveryInput): void;
+  retire(input: { playerId: string; out: boolean }): void;
   undo(): void;
   redo(): void;
   editBall(ballId: string, input: DeliveryInput): void;
