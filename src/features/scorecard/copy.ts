@@ -38,6 +38,26 @@ export interface ScorecardCopy {
   runRateTitle: string;
   noChartData: string;
   chaseProgress: string;
+  replayTitle: string;
+  replayShow: string;
+  replayHide: string;
+  replayPlay: string;
+  replayPause: string;
+  replayPrev: string;
+  replayNext: string;
+  replayPosition: string;
+  replayScrubA11y: string;
+  replayBall: string;
+  replayDot: string;
+  replayRuns: string;
+  replayFour: string;
+  replaySix: string;
+  replayWicket: string;
+  replayWide: string;
+  replayNoBall: string;
+  replayBye: string;
+  replayLegBye: string;
+  replayEmpty: string;
 }
 
 const en: ScorecardCopy = {
@@ -77,6 +97,26 @@ const en: ScorecardCopy = {
   runRateTitle: 'Run rate',
   noChartData: 'No balls bowled yet',
   chaseProgress: '{runs} of {target}',
+  replayTitle: 'Replay',
+  replayShow: 'Show',
+  replayHide: 'Hide',
+  replayPlay: 'Play',
+  replayPause: 'Pause',
+  replayPrev: 'Prev',
+  replayNext: 'Next',
+  replayPosition: '{k} / {n}',
+  replayScrubA11y: 'Replay position',
+  replayBall: '{over} - {what}',
+  replayDot: 'DOT',
+  replayRuns: '{n} RUN',
+  replayFour: 'FOUR',
+  replaySix: 'SIX',
+  replayWicket: 'WICKET',
+  replayWide: 'WIDE +{n}',
+  replayNoBall: 'NO BALL +{n}',
+  replayBye: 'BYE +{n}',
+  replayLegBye: 'LEG BYE +{n}',
+  replayEmpty: 'Before the first ball',
 };
 
 const hi: Partial<ScorecardCopy> = {
@@ -85,6 +125,16 @@ const hi: Partial<ScorecardCopy> = {
   partnerships: 'Saajhedaari',
   needOff: 'Chahiye {runs}, {balls} ball mein',
   chartsTitle: 'Vishleshan',
+  replayTitle: 'Replay (dobara dekho)',
+  replayShow: 'Dikhao',
+  replayHide: 'Chhupao',
+  replayPlay: 'Chalao',
+  replayPause: 'Roko',
+  replayPrev: 'Pichla',
+  replayNext: 'Agla',
+  replayScrubA11y: 'Replay ki jagah',
+  replayWicket: 'WICKET!',
+  replayEmpty: 'Pehli ball se pehle',
 };
 
 export function scorecardCopy(

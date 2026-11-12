@@ -17,6 +17,7 @@ import { BowlingTable } from '../../src/features/scorecard/BowlingTable';
 import { ExtrasLine } from '../../src/features/scorecard/ExtrasLine';
 import { FowList } from '../../src/features/scorecard/FowList';
 import { ChartsPanel } from '../../src/features/scorecard/ChartsPanel';
+import { Replay } from '../../src/features/scorecard/Replay';
 import { PartnershipList } from '../../src/features/scorecard/PartnershipList';
 
 export default function ScorecardScreen() {
@@ -69,6 +70,7 @@ export default function ScorecardScreen() {
           <PartnershipList state={state} inningsIndex={idx} />
         </Surface>
         <ChartsPanel state={state} inningsIndex={idx} />
+        <Replay state={state} />
       </View>
     </Screen>
   );
