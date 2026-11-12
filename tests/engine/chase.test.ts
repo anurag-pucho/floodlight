@@ -73,7 +73,7 @@ describe('innings transition', () => {
     }
     expect(replay.events.map(e => e.inningsIndex)).toEqual(events.map(e => e.inningsIndex));
     expect(replay.events[7].inningsIndex).toBe(1);
-    expect(Object.keys(replay).sort()).toEqual(['config', 'events', 'redo']);
+    expect(Object.keys(replay).sort()).toEqual(['config', 'events', 'redo', 'seq']);
   });
 
   it('pointer moves back to 0 when innings 0 stops being complete (undo-style slice)', () => {

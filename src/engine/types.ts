@@ -40,4 +40,6 @@ export interface MatchState {
   config: MatchConfig;
   events: BallRecord[];
   redo: BallRecord[];
+  /** Monotonic counter for ball ids; incremented on every append, never reused. */
+  seq: number;
 }

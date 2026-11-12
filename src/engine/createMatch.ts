@@ -2,7 +2,7 @@ import { MatchConfig, MatchState } from './types';
 import { inningsComplete } from './select';
 
 export function createMatch(config: MatchConfig): MatchState {
-  return { config, events: [], redo: [] };
+  return { config, events: [], redo: [], seq: 0 };
 }
 
 /**

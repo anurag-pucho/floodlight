@@ -1,6 +1,7 @@
 export * from './types';
 export { createMatch, startNextInnings } from './createMatch';
 export { applyDelivery } from './applyDelivery';
+export { undo, redo, editBall, replayTo } from './undo';
 export {
   legalBallsInCurrentOver,
   onStrikeId,
