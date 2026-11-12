@@ -61,10 +61,10 @@ describe('ChartsPanel', () => {
     await renderPanel(seeded(), 0);
     expect(screen.getByTestId('manhattan-y-0')).toBeTruthy();
     expect(screen.getByTestId('manhattan-y-10')).toBeTruthy();
-    expect(screen.getByTestId('manhattan-x-1').toBeTruthy();
-    expect(screen.getByTestId('manhattan-x-2').toBeTruthy();
-    expect(screen.getByTestId('worm-y-0').toBeTruthy();
-    expect(screen.getByTestId('worm-x-3').toBeTruthy();
+    expect(screen.getByTestId('manhattan-x-1')).toBeTruthy();
+    expect(screen.getByTestId('manhattan-x-2')).toBeTruthy();
+    expect(screen.getByTestId('worm-y-0')).toBeTruthy();
+    expect(screen.getByTestId('worm-x-3')).toBeTruthy();
   });
 
   it('draws the worm as a Path for both innings with wicket dots', async () => {
