@@ -1,5 +1,5 @@
-import { BallRecord, DeliveryInput, MatchState } from './types';
-import { currentInningsIndex, isFreeHit, legalBallCount } from './select';
+import { BallRecord, DeliveryInput, MatchState, RetireEvent } from './types';
+import { batsmenAtCrease, currentInningsIndex, isFreeHit, legalBallCount } from './select';
 import { BALLS_PER_OVER, isLegalDelivery, wicketAllowed } from './rules';
 
 /** Build a record for `input` against the current events of `state`, using the given id. */
@@ -29,5 +29,30 @@ export function buildRecord(state: MatchState, input: DeliveryInput, id: string)
 export function applyDelivery(state: MatchState, input: DeliveryInput): MatchState {
   const seq = state.seq + 1;
   const record = buildRecord(state, input, `${state.config.id}-${seq}`);
-  return { ...state, events: [...state.events, record], redo: [], seq };
+  return {
+    ...state,
+    events: [...state.events, record],
+    redo: [],
+    ...(state.redoRetires ? { redoRetires: [] } : {}),
+    seq,
+  };
+}
+
+/** Log a retirement for the current innings. The player must be at the crease. */
+export function applyRetire(state: MatchState, input: { playerId: string; out: boolean }): MatchState {
+  const crease = batsmenAtCrease(state);
+  if (input.playerId === '' || (crease.strikerId !== input.playerId && crease.nonStrikerId !== input.playerId)) {
+    throw new Error('Only a batter at the crease can retire');
+  }
+  const seq = state.seq + 1;
+  const event: RetireEvent = {
+    id: `${state.config.id}-r${seq}`,
+    seq,
+    kind: 'retire',
+    inningsIndex: currentInningsIndex(state),
+    playerId: input.playerId,
+    out: input.out,
+    at: state.events.length,
+  };
+  return { ...state, retires: [...(state.retires ?? []), event], redo: [], redoRetires: [], seq };
 }

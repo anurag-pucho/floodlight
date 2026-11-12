@@ -1,6 +1,6 @@
 export * from './types';
 export { createMatch, startNextInnings } from './createMatch';
-export { applyDelivery } from './applyDelivery';
+export { applyDelivery, applyRetire } from './applyDelivery';
 export { undo, redo, editBall, replayTo } from './undo';
 export {
   legalBallsInCurrentOver,
@@ -12,6 +12,7 @@ export {
   bowlerConceded,
   batsmenAtCrease,
   dismissedIds,
+  retiredHurtIds,
   wicketsDown,
   bowlerWickets,
   bowlerOversBowled,

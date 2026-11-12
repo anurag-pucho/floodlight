@@ -39,10 +39,29 @@ export interface BallRecord extends DeliveryInput {
   /** Raw wicket as entered; `wicket` is the effective one after rule filtering. */
   enteredWicket?: Wicket;
 }
+/**
+ * A non-delivery log event: a batter leaves the crease without a ball being bowled.
+ * `out:true` is a dismissal ("retired out"); `out:false` is retired hurt (may bat again).
+ * `at` is the number of deliveries in `events` when it was logged, which fixes its position
+ * in the combined log (it sits just before delivery index `at`).
+ */
+export interface RetireEvent {
+  id: string;
+  seq: number;
+  kind: 'retire';
+  inningsIndex: 0 | 1;
+  playerId: string;
+  out: boolean;
+  at: number;
+}
 export interface MatchState {
   config: MatchConfig;
   events: BallRecord[];
+  /** Retire events, interleaved with `events` via `at`. Absent on legacy states (treated as empty). */
+  retires?: RetireEvent[];
   redo: BallRecord[];
+  /** Undone retire events awaiting redo (same stack discipline as `redo`). */
+  redoRetires?: RetireEvent[];
   /** Monotonic counter for ball ids; incremented on every append, never reused. */
   seq: number;
 }

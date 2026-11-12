@@ -1,4 +1,4 @@
-import { BallRecord, MatchConfig, MatchState } from './types';
+import { BallRecord, MatchConfig, MatchState, RetireEvent } from './types';
 import { BALLS_PER_OVER, ballBowlerRuns, ballTotalRuns, runsRun } from './rules';
 
 export function currentInningsIndex(state: MatchState): 0 | 1 {
@@ -27,12 +27,30 @@ export function batsmenAtCrease(state: MatchState): { strikerId: string; nonStri
   return creaseFor(state, currentInningsIndex(state));
 }
 
+/** Retire events of an innings, in log order. */
+export function inningsRetires(state: MatchState, inningsIndex: 0 | 1): RetireEvent[] {
+  return (state.retires ?? []).filter(r => r.inningsIndex === inningsIndex);
+}
+
 function creaseFor(state: MatchState, inningsIndex: 0 | 1): { strikerId: string; nonStrikerId: string } {
-  const events = inningsEvents(state, inningsIndex);
+  const retires = state.retires ?? [];
   let striker = '';
   let non = '';
   let legal = 0;
-  for (const e of events) {
+  let ri = 0;
+  // A retire event sits just before delivery index `at`; apply those due before each delivery.
+  const applyRetiresUpTo = (upTo: number): void => {
+    while (ri < retires.length && retires[ri].at <= upTo) {
+      const r = retires[ri++];
+      if (r.inningsIndex !== inningsIndex) continue;
+      if (striker === r.playerId) striker = '';
+      else if (non === r.playerId) non = '';
+    }
+  };
+  for (let i = 0; i < state.events.length; i++) {
+    applyRetiresUpTo(i);
+    const e = state.events[i];
+    if (e.inningsIndex !== inningsIndex) continue;
     striker = e.strikerId;
     non = e.nonStrikerId;
     if (runsRun(e) % 2 === 1) [striker, non] = [non, striker];
@@ -45,6 +63,7 @@ function creaseFor(state: MatchState, inningsIndex: 0 | 1): { strikerId: string;
       else if (non === e.wicket.outPlayerId) non = '';
     }
   }
+  applyRetiresUpTo(Number.POSITIVE_INFINITY);
   return { strikerId: striker, nonStrikerId: non };
 }
 
@@ -56,11 +75,27 @@ export function onStrikeId(state: MatchState): string {
 export function dismissedIds(state: MatchState, inningsIndex: 0 | 1): Set<string> {
   const out = new Set<string>();
   for (const e of inningsEvents(state, inningsIndex)) if (e.wicket) out.add(e.wicket.outPlayerId);
+  for (const r of inningsRetires(state, inningsIndex)) if (r.out) out.add(r.playerId);
   return out;
 }
 
+/** Batters who retired hurt, are not out, and are not currently at the crease (they may bat again). */
+export function retiredHurtIds(state: MatchState, inningsIndex: 0 | 1): Set<string> {
+  const crease = creaseFor(state, inningsIndex);
+  const dismissed = dismissedIds(state, inningsIndex);
+  const hurt = new Set<string>();
+  for (const r of inningsRetires(state, inningsIndex)) {
+    if (!r.out && !dismissed.has(r.playerId) && r.playerId !== crease.strikerId && r.playerId !== crease.nonStrikerId) {
+      hurt.add(r.playerId);
+    }
+  }
+  return hurt;
+}
+
+/** Wickets: dismissals on a ball plus retired-out batters (retired hurt does not count). */
 export function wicketsDown(state: MatchState, inningsIndex: 0 | 1): number {
-  return inningsEvents(state, inningsIndex).filter(e => e.wicket).length;
+  return inningsEvents(state, inningsIndex).filter(e => e.wicket).length
+    + inningsRetires(state, inningsIndex).filter(r => r.out).length;
 }
 
 /** Wickets credited to a bowler (run-outs excluded). */
@@ -108,7 +143,23 @@ export function fallOfWickets(state: MatchState, inningsIndex: 0 | 1): FallOfWic
   const out: FallOfWicket[] = [];
   let score = 0;
   let legal = 0;
-  for (const e of inningsEvents(state, inningsIndex)) {
+  const retires = (state.retires ?? []).filter(r => r.inningsIndex === inningsIndex && r.out);
+  let ri = 0;
+  const flushRetires = (upTo: number): void => {
+    while (ri < retires.length && retires[ri].at <= upTo) {
+      const r = retires[ri++];
+      out.push({
+        wicketNo: out.length + 1,
+        score,
+        over: `${Math.floor(legal / BALLS_PER_OVER)}.${legal % BALLS_PER_OVER}`,
+        outPlayerId: r.playerId,
+      });
+    }
+  };
+  for (let i = 0; i < state.events.length; i++) {
+    flushRetires(i);
+    const e = state.events[i];
+    if (e.inningsIndex !== inningsIndex) continue;
     score += ballTotalRuns(e, state.config.rules);
     if (e.legal) legal += 1;
     if (e.wicket) {
@@ -120,6 +171,7 @@ export function fallOfWickets(state: MatchState, inningsIndex: 0 | 1): FallOfWic
       });
     }
   }
+  flushRetires(Number.POSITIVE_INFINITY);
   return out;
 }
 
@@ -287,6 +339,9 @@ export function battingCard(state: MatchState, inningsIndex: 0 | 1): BattingRow[
       if (id && !seen.has(id)) { seen.add(id); order.push(id); }
     }
   }
+  const retires = inningsRetires(state, inningsIndex);
+  for (const r of retires) if (!seen.has(r.playerId)) { seen.add(r.playerId); order.push(r.playerId); }
+  const hurt = retiredHurtIds(state, inningsIndex);
   const dismissed = dismissedIds(state, inningsIndex);
   return order.map(playerId => {
     const faced = events.filter(e => e.strikerId === playerId && e.extra?.type !== 'wide');
@@ -304,6 +359,9 @@ export function battingCard(state: MatchState, inningsIndex: 0 | 1): BattingRow[
     if (row.out) {
       const outEvent = events.find(e => e.wicket?.outPlayerId === playerId);
       if (outEvent) row.dismissal = dismissalText(state, outEvent);
+      else if (retires.some(r => r.out && r.playerId === playerId)) row.dismissal = 'retired out';
+    } else if (hurt.has(playerId)) {
+      row.dismissal = 'retired hurt';
     }
     return row;
   });
