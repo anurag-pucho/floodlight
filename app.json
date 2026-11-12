@@ -13,9 +13,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "backgroundColor": "#0B0F0E"
+      "backgroundColor": "#0B0F0E",
+      "bundleIdentifier": "ai.pucho.floodlight"
     },
     "android": {
+      "package": "ai.pucho.floodlight",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
