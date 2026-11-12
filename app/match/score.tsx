@@ -38,7 +38,8 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const topBar = <ScreenHeader title={sc('scoringTitle')} />;
-  const celebration = v.milestone ? (
+  // Defer while a blocking new-batter/new-bowler prompt (a native Modal) is open; the timer only starts on mount.
+  const celebration = v.milestone && v.need === null ? (
     <MilestoneCelebration
       key={v.milestone.key}
       kind={v.milestone.kind}

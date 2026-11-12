@@ -442,4 +442,26 @@ describe('milestone celebrations', () => {
     expect(screen.getByText('3-FER!')).toBeTruthy();
     expect(screen.getByTestId('milestone-player')).toHaveTextContent('P-b1');
   });
+  it('defers a wicket milestone while the new-batter prompt is open, then shows it', async () => {
+    const withA5 = (c: MatchConfig): MatchConfig => ({
+      ...c,
+      teamA: { ...c.teamA, players: [...c.teamA.players, { playerId: 'a5', isShared: false }] },
+      players: { ...c.players, a5: { id: 'a5', name: 'P-a5' } },
+    });
+    const { store } = setup({ oversPerInnings: 10 }, withA5);
+    seed(store, [
+      { striker: 'a1', non: 'a2', runs: 0, out: true },
+      { striker: 'a3', non: 'a2', runs: 0, out: true },
+    ]);
+    await mount(store);
+    await press('pick-a4');
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+    expect(screen.queryByTestId('milestone-celebration')).toBeNull();
+
+    await press('pick-a5');
+    expect(screen.getByText('3-FER!')).toBeTruthy();
+  });
 });
