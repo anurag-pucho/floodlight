@@ -53,6 +53,7 @@ export function HomeScreen({ checkResumable = defaultCheck }: HomeScreenProps) {
       <TapButton label={t('newMatch')} onPress={() => router.push('/match/setup')} haptic="medium" />
       <TapButton variant="secondary" label={homeCopy('matches', lang)} onPress={() => router.push('/matches')} />
       <TapButton variant="secondary" label={statsCopy('stats', lang)} onPress={() => router.push('/stats')} />
+      <TapButton variant="secondary" label={t('settings')} onPress={() => router.push('/settings')} />
     </Screen>
   );
 }

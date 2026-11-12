@@ -12,6 +12,7 @@ import {
 import { SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { useThemeControls } from '../src/theme/useTheme';
+import { PrefsBootstrap } from '../src/prefs/PrefsBootstrap';
 
 function Shell() {
   const { theme, scheme } = useThemeControls();
@@ -40,6 +41,7 @@ export default function RootLayout() {
   if (!loaded && !error) return null;
   return (
     <ThemeProvider>
+      <PrefsBootstrap />
       <Shell />
     </ThemeProvider>
   );
