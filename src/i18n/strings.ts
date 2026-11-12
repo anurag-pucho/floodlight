@@ -7,6 +7,8 @@ export interface Strings {
   resume: string;
   history: string;
   settings: string;
+  back: string;
+  home: string;
   start: string;
   save: string;
   cancel: string;
@@ -65,6 +67,8 @@ export const en: Strings = {
   resume: 'Resume',
   history: 'History',
   settings: 'Settings',
+  back: 'Back',
+  home: 'Home',
   start: 'Start',
   save: 'Save',
   cancel: 'Cancel',
@@ -122,6 +126,8 @@ export const hi: Partial<Strings> = {
   newMatch: 'Naya Match',
   resume: 'Jaari Rakho',
   history: 'Purane Match',
+  back: 'Peeche',
+  home: 'Home',
   start: 'Shuru Karo',
   save: 'Save Karo',
   cancel: 'Radd Karo',
