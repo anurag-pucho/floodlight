@@ -1,22 +1,38 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
-import SetupScreen from '../../app/match/setup';
+import { SetupScreen, type SetupScreenProps } from '../../app/match/setup';
+import type { MatchState } from '../../src/engine';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockNewMatch = jest.fn();
 let mockUid = 0;
 
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('expo-router', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    replace: mockReplace,
+    back: jest.fn(),
+    canGoBack: () => true,
+  }),
+}));
 jest.mock('expo-crypto', () => ({ randomUUID: () => `u${++mockUid}` }));
 jest.mock('../../src/store/matchStore', () => ({
   useMatchStore: (sel: (s: { newMatch: unknown }) => unknown) => sel({ newMatch: mockNewMatch }),
 }));
 
-const mount = () =>
+const metrics = {
+  frame: { x: 0, y: 0, width: 390, height: 844 },
+  insets: { top: 47, left: 0, right: 0, bottom: 34 },
+};
+const mount = (props: SetupScreenProps = {}) =>
   render(
-    <ThemeProvider>
-      <SetupScreen />
-    </ThemeProvider>,
+    <SafeAreaProvider initialMetrics={metrics}>
+      <ThemeProvider>
+        <SetupScreen {...props} />
+      </ThemeProvider>
+    </SafeAreaProvider>,
   );
 
 const press = (id: string) => fireEvent.press(screen.getByTestId(id));
@@ -36,6 +52,7 @@ async function fillTeam(side: 'A' | 'B', name: string, p1: string, p2: string) {
 beforeEach(() => {
   mockPush.mockClear();
   mockNewMatch.mockClear();
+  mockReplace.mockClear();
   mockUid = 0;
 });
 
@@ -98,5 +115,138 @@ describe('setup wizard', () => {
     await type('rule-overs', '0');
     await press('setup-next');
     expect(screen.getByTestId('error-oversInvalid')).toBeTruthy();
+  });
+
+  it('marking a captain and keeper reflects in the built config', async () => {
+    await mount();
+    await press('setup-next');
+    await fillTeam('A', 'Lions', 'Asha', 'Bo');
+    await press('teamA-0-captain');
+    await press('teamA-1-keeper');
+    // choosing another captain replaces the first (never two)
+    await press('teamA-1-captain');
+    await press('setup-next');
+    await fillTeam('B', 'Tigers', 'Cy', 'Di');
+    await press('teamB-0-keeper');
+    await press('setup-next');
+    await press('setup-next');
+    await press('toss-winner-A');
+    await press('toss-choice-bowl');
+    await press('setup-start');
+
+    const c = mockNewMatch.mock.calls[0][0];
+    const name = (id: string) => c.players[id].name;
+    expect(
+      c.teamA.players
+        .filter((p: { isCaptain?: boolean }) => p.isCaptain)
+        .map((p: { playerId: string }) => name(p.playerId)),
+    ).toEqual(['Bo']);
+    expect(
+      c.teamA.players
+        .filter((p: { isWicketkeeper?: boolean }) => p.isWicketkeeper)
+        .map((p: { playerId: string }) => name(p.playerId)),
+    ).toEqual(['Bo']);
+    expect(
+      c.teamB.players
+        .filter((p: { isWicketkeeper?: boolean }) => p.isWicketkeeper)
+        .map((p: { playerId: string }) => name(p.playerId)),
+    ).toEqual(['Cy']);
+    expect(c.teamB.players.some((p: { isCaptain?: boolean }) => p.isCaptain)).toBe(false);
+    expect(c.battingFirst).toBe('B');
+  });
+
+  it('a renamed captain keeps the mark', async () => {
+    await mount();
+    await press('setup-next');
+    await fillTeam('A', 'Lions', 'Asha', 'Bo');
+    await press('teamA-0-captain');
+    await type('teamA-player-0', 'Ashwin');
+    expect(screen.getByTestId('teamA-0-captain').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('prefills both squads from an injected saved match', async () => {
+    const config = {
+      id: 'm1',
+      teamA: {
+        id: 'ta',
+        name: 'Royals',
+        color: '#111111',
+        players: [
+          { playerId: 'p1', isShared: true },
+          { playerId: 'p2', isShared: false, isCaptain: true },
+          { playerId: 'p3', isShared: false, isWicketkeeper: true },
+        ],
+      },
+      teamB: {
+        id: 'tb',
+        name: 'Kings',
+        color: '#222222',
+        players: [
+          { playerId: 'p1', isShared: true },
+          { playerId: 'p4', isShared: false },
+        ],
+      },
+      players: {
+        p1: { id: 'p1', name: 'Sam' },
+        p2: { id: 'p2', name: 'Ravi' },
+        p3: { id: 'p3', name: 'Tom' },
+        p4: { id: 'p4', name: 'Uma' },
+      },
+      rules: {},
+      battingFirst: 'A',
+    };
+    const repo = {
+      listMatches: jest.fn().mockResolvedValue([
+        {
+          id: 'm1',
+          teamAName: 'Royals',
+          teamBName: 'Kings',
+          overs: 10,
+          status: 'complete',
+          updatedAt: 5,
+        },
+      ]),
+      loadMatch: jest.fn().mockResolvedValue({
+        config,
+        events: [],
+        redo: [],
+        seq: 0,
+      } as unknown as MatchState),
+    };
+    await mount({ repo });
+    await press('setup-use-previous');
+    await waitFor(() => expect(screen.getByTestId('previous-match-m1')).toBeTruthy());
+    await press('previous-match-m1');
+    await waitFor(() => expect(screen.getByTestId('setup-loaded-previous')).toBeTruthy());
+    expect(screen.getByTestId('shared-player-0').props.value).toBe('Sam');
+    await press('setup-next');
+    expect(screen.getByTestId('team-A-name').props.value).toBe('Royals');
+    expect(screen.getByTestId('teamA-player-0').props.value).toBe('Ravi');
+    expect(screen.getByTestId('teamA-0-captain').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('teamA-1-keeper').props.accessibilityState.selected).toBe(true);
+    await press('setup-next');
+    expect(screen.getByTestId('team-B-name').props.value).toBe('Kings');
+    expect(screen.getByTestId('teamB-player-0').props.value).toBe('Uma');
+  });
+
+  it('the coin flip picks the toss winner and battingFirst follows the choice', async () => {
+    await mount({ random: () => 0.9 }); // tails -> second team wins the toss
+    await press('setup-next');
+    await fillTeam('A', 'Lions', 'Asha', 'Bo');
+    await press('setup-next');
+    await fillTeam('B', 'Tigers', 'Cy', 'Di');
+    await press('setup-next');
+    await press('setup-next');
+    await press('toss-flip');
+    expect(screen.getByTestId('toss-winner-B').props.accessibilityState.selected).toBe(true);
+    await press('toss-choice-bowl');
+    await press('setup-start');
+    expect(mockNewMatch.mock.calls[0][0].battingFirst).toBe('A');
+  });
+
+  it('header Home navigates to the root', async () => {
+    await mount();
+    await press('header-home');
+    expect(mockReplace).toHaveBeenCalledWith('/');
   });
 });

@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { Surface } from '../../src/components/Surface';
 import { TapButton } from '../../src/components/TapButton';
 import { Text } from '../../src/components/Text';
 import { useMatchStore } from '../../src/store/matchStore';
 import { useTheme } from '../../src/theme/useTheme';
+import type { MatchSummary } from '../../src/db/types';
 import {
   buildConfig,
   isValid,
+  nameKey,
+  prefillFromConfig,
   validateSetup,
   type RulesInput,
   type SetupErrorCode,
@@ -19,6 +23,7 @@ import {
   type TossInput,
 } from '../../src/features/setup/buildConfig';
 import { RuleToggles } from '../../src/features/setup/RuleToggles';
+import { openSavedMatchSource, type SavedMatchSource } from '../../src/features/setup/savedMatches';
 import { SquadEditor } from '../../src/features/setup/SquadEditor';
 import { TossFlip } from '../../src/features/setup/TossFlip';
 import { useSetupT, type SetupStrings } from '../../src/features/setup/setupStrings';
@@ -31,6 +36,7 @@ const ERROR_KEY: Record<SetupErrorCode, keyof SetupStrings> = {
   duplicatePlayer: 'errDuplicate',
   squadTooSmall: 'errSquad',
   oversInvalid: 'errOvers',
+  roleNotInSquad: 'errRole',
 };
 
 const DEFAULT_RULES: RulesInput = {
@@ -43,7 +49,14 @@ const DEFAULT_RULES: RulesInput = {
   maxOversPerBowler: 0,
 };
 
-export default function SetupScreen() {
+export interface SetupScreenProps {
+  /** Saved-match source for "use teams from a previous match"; defaults to the on-device DB. */
+  repo?: SavedMatchSource;
+  /** Injectable coin randomness (tests). */
+  random?: () => number;
+}
+
+export function SetupScreen({ repo, random }: SetupScreenProps) {
   const { colors, spacing, radii, typography, elevation } = useTheme();
   const st = useSetupT();
   const router = useRouter();
@@ -51,11 +64,65 @@ export default function SetupScreen() {
 
   const [step, setStep] = useState(0);
   const [attempted, setAttempted] = useState(false);
-  const [teamA, setTeamA] = useState<TeamInput>({ name: '', color: colors.primary, players: ['', ''] });
-  const [teamB, setTeamB] = useState<TeamInput>({ name: '', color: colors.secondary, players: ['', ''] });
+  const [teamA, setTeamA] = useState<TeamInput>({
+    name: '',
+    color: colors.primary,
+    players: ['', ''],
+  });
+  const [teamB, setTeamB] = useState<TeamInput>({
+    name: '',
+    color: colors.secondary,
+    players: ['', ''],
+  });
   const [shared, setShared] = useState<string[]>([]);
   const [rules, setRules] = useState<RulesInput>(DEFAULT_RULES);
   const [toss, setToss] = useState<Partial<TossInput>>({});
+  const [picker, setPicker] = useState<MatchSummary[] | 'loading' | null>(null);
+  const [loadedFromPrevious, setLoadedFromPrevious] = useState(false);
+
+  const openPicker = (): void => {
+    setPicker('loading');
+    (repo ? Promise.resolve(repo) : openSavedMatchSource())
+      .then((r) => r.listMatches())
+      .then((list) => setPicker([...list].sort((a, b) => b.updatedAt - a.updatedAt)))
+      .catch(() => setPicker([]));
+  };
+
+  const pickPrevious = (id: string): void => {
+    (repo ? Promise.resolve(repo) : openSavedMatchSource())
+      .then((r) => r.loadMatch(id))
+      .then((state) => {
+        if (!state) return;
+        const pre = prefillFromConfig(state.config);
+        setTeamA(pre.teamA);
+        setTeamB(pre.teamB);
+        setShared(pre.shared);
+        setLoadedFromPrevious(true);
+        setAttempted(false);
+      })
+      .catch(() => undefined)
+      .finally(() => setPicker(null));
+  };
+
+  /** Renaming a shared player keeps it marked as captain / keeper of each team. */
+  const changeShared = (next: string[]): void => {
+    if (next.length === shared.length) {
+      const remap = (team: TeamInput): TeamInput => {
+        let out = team;
+        next.forEach((name, i) => {
+          const old = shared[i];
+          if (old === name) return;
+          if (out.captain && nameKey(out.captain) === nameKey(old)) out = { ...out, captain: name.trim() };
+          if (out.wicketkeeper && nameKey(out.wicketkeeper) === nameKey(old))
+            out = { ...out, wicketkeeper: name.trim() };
+        });
+        return out;
+      };
+      setTeamA(remap);
+      setTeamB(remap);
+    }
+    setShared(next);
+  };
 
   const palette = [colors.primary, colors.secondary, colors.four, colors.six, colors.gold];
   const current = STEPS[step];
@@ -103,7 +170,13 @@ export default function SetupScreen() {
       setAttempted(true);
       return;
     }
-    const input: SetupInput = { teamA, teamB, shared, rules, toss: { winner: toss.winner, choice: toss.choice } };
+    const input: SetupInput = {
+      teamA,
+      teamB,
+      shared,
+      rules,
+      toss: { winner: toss.winner, choice: toss.choice },
+    };
     newMatch(buildConfig(input));
     router.push('/match/score');
   };
@@ -155,13 +228,17 @@ export default function SetupScreen() {
         ))}
       </View>
       <Text variant="label" color="textSecondary">
-        {st('squadCount')}{' '}
-        <Text variant="numeric">{team.players.length + shared.length}</Text>
+        {st('squadCount')} <Text variant="numeric">{team.players.length + shared.length}</Text>
       </Text>
       <SquadEditor
         players={team.players}
-        onChange={(players) => setTeam({ ...team, players })}
+        onChange={(players, marks) => setTeam({ ...team, players, ...(marks ?? {}) })}
         testIDPrefix={`team${side}`}
+        roles={{
+          shared,
+          captain: team.captain,
+          wicketkeeper: team.wicketkeeper,
+        }}
       />
     </View>
   );
@@ -175,62 +252,130 @@ export default function SetupScreen() {
   };
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingBottom: spacing['4xl'] }}>
-        <Text variant="heading">{st('title')}</Text>
-        <Text variant="label" color="textSecondary" testID="setup-step">
-          {`${step + 1}/${STEPS.length} · ${st(titleKey[current])}`}
-        </Text>
+    <Screen header={<ScreenHeader title={st('title')} />} style={{ gap: spacing.lg }}>
+      <Text variant="label" color="textSecondary" testID="setup-step">
+        {`${step + 1}/${STEPS.length} · ${st(titleKey[current])}`}
+      </Text>
+      {current === 'shared' ? (
         <Surface>
-          {current === 'shared' ? (
-            <View style={{ gap: spacing.md }}>
-              <Text color="textSecondary">{st('sharedHint')}</Text>
-              <SquadEditor players={shared} onChange={setShared} testIDPrefix="shared" />
-            </View>
-          ) : null}
-          {current === 'teamA' ? renderTeam('A', teamA, setTeamA) : null}
-          {current === 'teamB' ? renderTeam('B', teamB, setTeamB) : null}
-          {current === 'rules' ? <RuleToggles rules={rules} onChange={setRules} /> : null}
-          {current === 'toss' ? (
-            <TossFlip
-              teamAName={teamA.name.trim()}
-              teamBName={teamB.name.trim()}
-              toss={toss}
-              onChange={setToss}
+          <View style={{ gap: spacing.md }}>
+            <TapButton
+              testID="setup-use-previous"
+              label={st('usePrevious')}
+              variant="secondary"
+              onPress={openPicker}
             />
-          ) : null}
+            {loadedFromPrevious ? (
+              <Text variant="caption" color="primary" testID="setup-loaded-previous">
+                {st('loadedPrevious')}
+              </Text>
+            ) : null}
+            {picker === 'loading' ? (
+              <Text variant="caption" color="textSecondary">
+                {st('loadingPrevious')}
+              </Text>
+            ) : null}
+            {Array.isArray(picker) ? (
+              <View style={{ gap: spacing.sm }} testID="setup-previous-list">
+                <Text variant="label" color="textSecondary">
+                  {st('previousTitle')}
+                </Text>
+                {picker.length === 0 ? (
+                  <Text variant="caption" color="textSecondary">
+                    {st('noPrevious')}
+                  </Text>
+                ) : (
+                  picker.map((m) => (
+                    <Pressable
+                      key={m.id}
+                      testID={`previous-match-${m.id}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${m.teamAName} ${st('vs')} ${m.teamBName}`}
+                      onPress={() => pickPrevious(m.id)}
+                      style={{
+                        padding: spacing.md,
+                        borderRadius: radii.md,
+                        backgroundColor: colors.surfaceAlt,
+                        borderWidth: elevation.hairlineWidth,
+                        borderColor: colors.hairline,
+                        gap: spacing.xs,
+                      }}
+                    >
+                      <Text variant="label">{`${m.teamAName} ${st('vs')} ${m.teamBName}`}</Text>
+                      <Text variant="caption" color="textSecondary">
+                        {`${m.overs} ${st('overs')}`}
+                      </Text>
+                    </Pressable>
+                  ))
+                )}
+                <TapButton
+                  testID="setup-previous-close"
+                  label={st('closePicker')}
+                  variant="ghost"
+                  haptic="none"
+                  onPress={() => setPicker(null)}
+                />
+              </View>
+            ) : null}
+          </View>
         </Surface>
-        {visibleErrors.map((code) => (
-          <Text key={code} color="wicket" testID={`error-${code}`}>
-            {st(ERROR_KEY[code])}
-          </Text>
-        ))}
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          {step > 0 ? (
-            <TapButton
-              testID="setup-back"
-              label={st('back')}
-              variant="ghost"
-              onPress={() => {
-                setAttempted(false);
-                setStep((s) => Math.max(0, s - 1));
-              }}
-              style={{ flex: 1 }}
-            />
-          ) : null}
-          {current === 'toss' ? (
-            <TapButton
-              testID="setup-start"
-              label={st('startMatch')}
-              disabled={!tossDone}
-              onPress={submit}
-              style={{ flex: 2 }}
-            />
-          ) : (
-            <TapButton testID="setup-next" label={st('next')} onPress={goNext} style={{ flex: 2 }} />
-          )}
-        </View>
-      </ScrollView>
+      ) : null}
+      <Surface>
+        {current === 'shared' ? (
+          <View style={{ gap: spacing.md }}>
+            <Text color="textSecondary">{st('sharedHint')}</Text>
+            <SquadEditor players={shared} onChange={changeShared} testIDPrefix="shared" />
+          </View>
+        ) : null}
+        {current === 'teamA' ? renderTeam('A', teamA, setTeamA) : null}
+        {current === 'teamB' ? renderTeam('B', teamB, setTeamB) : null}
+        {current === 'rules' ? <RuleToggles rules={rules} onChange={setRules} /> : null}
+        {current === 'toss' ? (
+          <TossFlip
+            teamAName={teamA.name.trim()}
+            teamBName={teamB.name.trim()}
+            teamAColor={teamA.color}
+            teamBColor={teamB.color}
+            toss={toss}
+            onChange={setToss}
+            random={random}
+          />
+        ) : null}
+      </Surface>
+      {visibleErrors.map((code) => (
+        <Text key={code} color="wicket" testID={`error-${code}`}>
+          {st(ERROR_KEY[code])}
+        </Text>
+      ))}
+      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        {step > 0 ? (
+          <TapButton
+            testID="setup-back"
+            label={st('back')}
+            variant="ghost"
+            onPress={() => {
+              setAttempted(false);
+              setStep((s) => Math.max(0, s - 1));
+            }}
+            style={{ flex: 1 }}
+          />
+        ) : null}
+        {current === 'toss' ? (
+          <TapButton
+            testID="setup-start"
+            label={st('startMatch')}
+            disabled={!tossDone}
+            onPress={submit}
+            style={{ flex: 2 }}
+          />
+        ) : (
+          <TapButton testID="setup-next" label={st('next')} onPress={goNext} style={{ flex: 2 }} />
+        )}
+      </View>
     </Screen>
   );
+}
+
+export default function Setup() {
+  return <SetupScreen />;
 }

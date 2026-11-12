@@ -3,7 +3,7 @@ import { useT } from '../../i18n/useT';
 import type { Lang } from '../../i18n/strings';
 
 const en = {
-  title: 'New match',
+  title: 'New Match',
   stepTeamA: 'Team A',
   stepTeamB: 'Team B',
   stepShared: 'Shared players',
@@ -36,6 +36,27 @@ const en = {
   errSquad: 'A squad needs at least 2 players.',
   errOvers: 'Overs must be at least 1.',
   wonToss: 'won the toss',
+  errRole: 'Captain and wicketkeeper must be players in this squad.',
+  captainChip: 'C',
+  keeperChip: 'WK',
+  captainLabel: 'Captain',
+  keeperLabel: 'Wicketkeeper',
+  rolesHint: 'Tap C for captain and WK for wicketkeeper. One of each per team.',
+  sharedPlayers: 'Shared players',
+  usePrevious: 'Use teams from a previous match',
+  previousTitle: 'Pick a previous match',
+  noPrevious: 'No saved matches yet.',
+  loadingPrevious: 'Loading matches...',
+  loadedPrevious: 'Teams loaded. Tweak anything, then continue.',
+  closePicker: 'Cancel',
+  vs: 'vs',
+  overs: 'overs',
+  coinHint: 'Heads is the first team, tails is the second.',
+  heads: 'Heads',
+  tails: 'Tails',
+  flipAgain: 'Flip again',
+  tossBatOrBowl: 'Bat or bowl?',
+  battingFirst: 'bats first',
 } as const;
 
 export type SetupStrings = typeof en;

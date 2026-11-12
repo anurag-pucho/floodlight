@@ -1,4 +1,10 @@
-import { buildConfig, validateSetup, isValid, type SetupInput } from '../../src/features/setup/buildConfig';
+import {
+  buildConfig,
+  validateSetup,
+  isValid,
+  prefillFromConfig,
+  type SetupInput,
+} from '../../src/features/setup/buildConfig';
 
 let mockN = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `id-${++mockN}` }));
@@ -93,5 +99,66 @@ describe('validateSetup', () => {
     i.teamB.players = [];
     i.shared = ['X', 'Y'];
     expect(isValid(validateSetup(i))).toBe(true);
+  });
+});
+
+describe('captain and wicketkeeper', () => {
+  it('flags exactly one captain and one keeper on the right team', () => {
+    const i = base();
+    i.teamA.captain = 'asha ';
+    i.teamA.wicketkeeper = 'Bo';
+    i.teamB.captain = 'Cy';
+    const c = buildConfig(i);
+    const nameOf = (id: string) => c.players[id].name;
+    const flagged = (t: typeof c.teamA, f: 'isCaptain' | 'isWicketkeeper') =>
+      t.players.filter((p) => p[f]).map((p) => nameOf(p.playerId));
+    expect(flagged(c.teamA, 'isCaptain')).toEqual(['Asha']);
+    expect(flagged(c.teamA, 'isWicketkeeper')).toEqual(['Bo']);
+    expect(flagged(c.teamB, 'isCaptain')).toEqual(['Cy']);
+    expect(flagged(c.teamB, 'isWicketkeeper')).toEqual([]);
+  });
+
+  it('a shared player can be captain of one team only, and a player can be both C and WK', () => {
+    const i = base();
+    i.teamA.captain = 'Sam';
+    i.teamA.wicketkeeper = 'Sam';
+    const c = buildConfig(i);
+    const samA = c.teamA.players.find((p) => p.isShared);
+    const samB = c.teamB.players.find((p) => p.isShared);
+    expect(samA).toMatchObject({ isCaptain: true, isWicketkeeper: true });
+    expect(samB?.isCaptain).toBeUndefined();
+    expect(c.teamA.players.filter((p) => p.isCaptain)).toHaveLength(1);
+    expect(c.teamA.players.filter((p) => p.isWicketkeeper)).toHaveLength(1);
+  });
+
+  it('omits flags when none chosen', () => {
+    const c = buildConfig(base());
+    expect(c.teamA.players.some((p) => p.isCaptain || p.isWicketkeeper)).toBe(false);
+  });
+
+  it('rejects a captain or keeper who is not in the squad', () => {
+    const i = base();
+    i.teamA.captain = 'Nobody';
+    i.teamB.wicketkeeper = 'Ghost';
+    const e = validateSetup(i);
+    expect(e.teamA).toContain('roleNotInSquad');
+    expect(e.teamB).toContain('roleNotInSquad');
+  });
+
+  it('prefillFromConfig round-trips names, shared flags and C/WK', () => {
+    const i = base();
+    i.teamA.captain = 'Asha';
+    i.teamB.wicketkeeper = 'Sam';
+    const pre = prefillFromConfig(buildConfig(i));
+    expect(pre.shared).toEqual(['Sam']);
+    expect(pre.teamA).toMatchObject({
+      name: 'Lions',
+      players: ['Asha', 'Bo'],
+      captain: 'Asha',
+    });
+    expect(pre.teamB).toMatchObject({
+      players: ['Cy', 'Di'],
+      wicketkeeper: 'Sam',
+    });
   });
 });
