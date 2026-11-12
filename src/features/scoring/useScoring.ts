@@ -324,8 +324,11 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   // Choices
   const out = dismissedIds(state, inn);
   const atCrease = new Set([strikerId, nonId].filter(Boolean));
+  // A shared player bowling the current (incomplete) over must finish it before he can bat.
+  const midOverSharedBowler =
+    last && last.overNumber === overIndex && isSharedPlayer(state.config, last.bowlerId) ? last.bowlerId : '';
   const batterChoices = squadPlayers(state, bat).filter(
-    (p) => !out.has(p.id) && !atCrease.has(p.id) && canSharedPlayerBat(state, p.id, inn),
+    (p) => !out.has(p.id) && !atCrease.has(p.id) && canSharedPlayerBat(state, p.id, inn) && p.id !== midOverSharedBowler,
   );
   const cap = state.config.rules.maxOversPerBowler;
   const fielders = squadPlayers(state, field);
