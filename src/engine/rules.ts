@@ -23,7 +23,7 @@ export function wicketAllowed(type: WicketType, d: DeliveryInput, freeHit: boole
   const runOutOrStumped = type === 'runout' || type === 'stumped';
   if (d.extra?.type === 'wide') return runOutOrStumped;
   if (d.extra?.type === 'noball') return type === 'runout';
-  if (freeHit) return type === 'runout' || type === 'retired';
+  if (freeHit) return runOutOrStumped || type === 'retired';
   return true;
 }
 
