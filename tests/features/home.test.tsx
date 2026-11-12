@@ -5,6 +5,7 @@ import { ThemeProvider } from '../../src/theme/ThemeProvider';
 import { HomeScreen } from '../../app/index';
 import { MatchesScreen, loadSavedMatches } from '../../app/matches';
 import { rematchConfig } from '../../src/features/home/rematch';
+import { DEFAULT_FILTERS, filterMatches } from '../../src/features/home/filterMatches';
 import type { MatchConfig } from '../../src/engine';
 import type { MatchRepo, MatchSummary } from '../../src/db/types';
 
@@ -146,5 +147,66 @@ describe('MatchesScreen', () => {
     };
     const out = await loadSavedMatches(repo);
     expect(out.map((e) => e.summary.id)).toEqual(['new', 'old']);
+  });
+});
+
+describe('filterMatches', () => {
+  const mk = (id: string, status: MatchSummary['status'], updatedAt: number, a: string, b: string, config?: MatchConfig) => ({
+    summary: { id, teamAName: a, teamBName: b, overs: 5, status, updatedAt } as MatchSummary,
+    result: null,
+    config,
+  });
+  const list = [
+    mk('new', 'in_progress', 9, 'Lions', 'Tigers'),
+    mk('mid', 'complete', 5, 'Alpha', 'Bravo', prevConfig),
+    mk('old', 'complete', 1, 'Sharks', 'Eagles'),
+  ];
+  const ids = (l: ReturnType<typeof filterMatches>) => l.map((e) => e.summary.id);
+
+  it('matches team names case-insensitively', () => {
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, query: 'tIgEr' }))).toEqual(['new']);
+  });
+  it('matches player names via the config', () => {
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, query: 'three' }))).toEqual(['mid']);
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, query: 'zzz' }))).toEqual([]);
+  });
+  it('status filter keeps only that status', () => {
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, status: 'complete' }))).toEqual(['mid', 'old']);
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, status: 'in_progress' }))).toEqual(['new']);
+  });
+  it('sort reverses order and does not mutate input', () => {
+    expect(ids(filterMatches(list, DEFAULT_FILTERS))).toEqual(['new', 'mid', 'old']);
+    expect(ids(filterMatches(list, { ...DEFAULT_FILTERS, sort: 'oldest' }))).toEqual(['old', 'mid', 'new']);
+    expect(ids(list)).toEqual(['new', 'mid', 'old']);
+  });
+});
+
+describe('MatchesScreen search + filters', () => {
+  const entries = [
+    { summary: { id: 'a', teamAName: 'Lions', teamBName: 'Tigers', overs: 5, status: 'in_progress', updatedAt: 9 } as MatchSummary, result: null },
+    { summary: { id: 'b', teamAName: 'Alpha', teamBName: 'Bravo', overs: 5, status: 'complete', updatedAt: 5 } as MatchSummary, result: 'Alpha won', config: prevConfig },
+  ];
+
+  it('typing narrows the list; a status chip filters; no match shows the no-results state', async () => {
+    await wrap(<MatchesScreen load={() => Promise.resolve(entries)} />);
+    expect(await screen.findByTestId('match-a')).toBeTruthy();
+    expect(screen.getByTestId('match-b')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByTestId('matches-search'), 'alp');
+    expect(screen.queryByTestId('match-a')).toBeNull();
+    expect(screen.getByTestId('match-b')).toBeTruthy();
+
+    await fireEvent.changeText(screen.getByTestId('matches-search'), '');
+    await fireEvent.press(screen.getByTestId('filter-status-in_progress'));
+    expect(screen.getByTestId('match-a')).toBeTruthy();
+    expect(screen.queryByTestId('match-b')).toBeNull();
+
+    await fireEvent.changeText(screen.getByTestId('matches-search'), 'nobody');
+    expect(screen.getByTestId('matches-no-results')).toBeTruthy();
+    expect(screen.queryByTestId('matches-empty')).toBeNull();
+
+    await fireEvent.press(screen.getByTestId('matches-clear-filters'));
+    expect(screen.getByTestId('match-a')).toBeTruthy();
+    expect(screen.getByTestId('match-b')).toBeTruthy();
   });
 });

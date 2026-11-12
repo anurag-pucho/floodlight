@@ -14,6 +14,13 @@ const en = {
   wonResult: '{team} won {margin}',
   vs: 'vs',
   rematch: 'Rematch',
+  searchPlaceholder: 'Search teams or players',
+  filterAll: 'All',
+  sortNewest: 'Newest',
+  sortOldest: 'Oldest',
+  noResultsTitle: 'No matches match your search',
+  noResultsBody: 'Try a different name or clear the filters.',
+  clearFilters: 'Clear filters',
 } as const;
 
 export type HomeCopyKey = keyof typeof en;
@@ -27,6 +34,13 @@ const hi: Partial<Record<HomeCopyKey, string>> = {
   emptyTitle: 'Pitch khaali hai',
   emptyBody: 'Pehla match shuru karo, signal na ho tab bhi yahin save rahega.',
   wonResult: '{team} ne jeeta {margin}',
+  searchPlaceholder: 'Team ya player dhoondo',
+  filterAll: 'Sab',
+  sortNewest: 'Naya pehle',
+  sortOldest: 'Purana pehle',
+  noResultsTitle: 'Koi match nahi mila',
+  noResultsBody: 'Doosra naam try karo ya filter hata do.',
+  clearFilters: 'Filter hatao',
 };
 
 export function homeCopy(key: HomeCopyKey, lang: Lang = getLang()): string {
