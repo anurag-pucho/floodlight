@@ -27,7 +27,7 @@ export function RunRatePanel({ state, inningsIndex }: { state: MatchState; innin
           <View>
             <Text variant="caption" color="textSecondary">{s('requiredRate', { rate: '' }).trim()}</Text>
             <Text variant="display" color="secondary" testID="required-rate-value" style={{ fontVariant: ['tabular-nums'] }}>
-              {chase.requiredRunRate.toFixed(2)}
+              {chase.ballsRemaining > 0 && Number.isFinite(chase.requiredRunRate) ? chase.requiredRunRate.toFixed(2) : '-'}
             </Text>
           </View>
         ) : null}
