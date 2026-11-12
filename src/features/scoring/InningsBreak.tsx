@@ -1,0 +1,127 @@
+import { useState } from 'react';
+import { useTheme } from '../../theme/useTheme';
+import { Surface } from '../../components/Surface';
+import { Text } from '../../components/Text';
+import { TapButton } from '../../components/TapButton';
+import type { Player } from '../../engine';
+import { Chip, ChipRow, SheetFrame, SheetSection } from './ExtrasSheet';
+import { useScoringT } from './useScoring';
+
+export interface InningsBreakProps {
+  mode: 'setup' | 'break';
+  title: string;
+  summary?: string;
+  targetLine?: string;
+  battingTeam: string;
+  batters: Player[];
+  bowlers: Player[];
+  onStart: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
+  onUndo?: () => void;
+}
+
+/** Opening pair + opening bowler selection; in `break` mode also shows the first-innings summary. */
+export function InningsBreak({
+  mode,
+  title,
+  summary,
+  targetLine,
+  battingTeam,
+  batters,
+  bowlers,
+  onStart,
+  onUndo,
+}: InningsBreakProps) {
+  const sc = useScoringT();
+  const { spacing } = useTheme();
+  const [striker, setStriker] = useState<string | null>(null);
+  const [non, setNon] = useState<string | null>(null);
+  const [bowler, setBowler] = useState<string | null>(null);
+  const ready = striker !== null && non !== null && bowler !== null && striker !== non;
+
+  return (
+    <Surface gradient testID="innings-break" style={{ gap: spacing.lg }}>
+      <Text variant="heading">{title}</Text>
+      {summary ? (
+        <Text variant="body" color="textSecondary">
+          {summary}
+        </Text>
+      ) : null}
+      {targetLine ? (
+        <Text variant="numeric" color="primary">
+          {targetLine}
+        </Text>
+      ) : null}
+      <SheetSection title={`${battingTeam} - ${sc('striker')}`}>
+        <ChipRow>
+          {batters.map((p) => (
+            <Chip
+              key={p.id}
+              testID={`open-striker-${p.id}`}
+              label={p.name}
+              selected={striker === p.id}
+              disabled={non === p.id}
+              onPress={() => setStriker(p.id)}
+            />
+          ))}
+        </ChipRow>
+      </SheetSection>
+      <SheetSection title={sc('nonStriker')}>
+        <ChipRow>
+          {batters.map((p) => (
+            <Chip
+              key={p.id}
+              testID={`open-non-${p.id}`}
+              label={p.name}
+              selected={non === p.id}
+              disabled={striker === p.id}
+              onPress={() => setNon(p.id)}
+            />
+          ))}
+        </ChipRow>
+      </SheetSection>
+      <SheetSection title={sc('bowler')}>
+        <ChipRow>
+          {bowlers.map((p) => (
+            <Chip
+              key={p.id}
+              testID={`open-bowler-${p.id}`}
+              label={p.name}
+              selected={bowler === p.id}
+              onPress={() => setBowler(p.id)}
+            />
+          ))}
+        </ChipRow>
+      </SheetSection>
+      <TapButton
+        testID="start-innings"
+        label={mode === 'break' ? sc('startSecondInnings') : sc('startInnings')}
+        disabled={!ready}
+        onPress={() => {
+          if (ready) onStart(striker, non, bowler);
+        }}
+      />
+      {onUndo ? <TapButton testID="break-undo" variant="ghost" label={sc('undo')} onPress={onUndo} /> : null}
+    </Surface>
+  );
+}
+
+export interface PlayerPromptProps {
+  visible: boolean;
+  title: string;
+  players: Player[];
+  onPick: (id: string) => void;
+  testID?: string;
+}
+
+/** Blocking prompt: choose the next batter or the next over's bowler. */
+export function PlayerPrompt({ visible, title, players, onPick, testID }: PlayerPromptProps) {
+  return (
+    <SheetFrame visible={visible} title={title} testID={testID}>
+      <ChipRow>
+        {players.map((p) => (
+          <Chip key={p.id} testID={`pick-${p.id}`} label={p.name} onPress={() => onPick(p.id)} />
+        ))}
+      </ChipRow>
+    </SheetFrame>
+  );
+}
