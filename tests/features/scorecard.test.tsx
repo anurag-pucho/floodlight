@@ -65,7 +65,7 @@ describe('scorecard screen', () => {
     await renderScreen();
     expect(screen.getByText('Need 10 off 5')).toBeTruthy();
     expect(screen.getByText('Target 14')).toBeTruthy();
-    expect(screen.getByTestId('charts-placeholder')).toBeTruthy();
+    expect(screen.getByTestId('charts-panel')).toBeTruthy();
   });
 
   it('renders batting and bowling rows for the selected innings and switches', async () => {

@@ -16,6 +16,7 @@ import { BattingTable } from '../../src/features/scorecard/BattingTable';
 import { BowlingTable } from '../../src/features/scorecard/BowlingTable';
 import { ExtrasLine } from '../../src/features/scorecard/ExtrasLine';
 import { FowList } from '../../src/features/scorecard/FowList';
+import { ChartsPanel } from '../../src/features/scorecard/ChartsPanel';
 import { PartnershipList } from '../../src/features/scorecard/PartnershipList';
 
 export default function ScorecardScreen() {
@@ -67,10 +68,7 @@ export default function ScorecardScreen() {
           <FowList state={state} inningsIndex={idx} />
           <PartnershipList state={state} inningsIndex={idx} />
         </Surface>
-        <Surface testID="charts-placeholder">
-          <Text variant="label" color="primary">{s('chartsTitle')}</Text>
-          <Text variant="caption" color="textSecondary">{s('chartsSoon')}</Text>
-        </Surface>
+        <ChartsPanel state={state} inningsIndex={idx} />
       </View>
     </Screen>
   );

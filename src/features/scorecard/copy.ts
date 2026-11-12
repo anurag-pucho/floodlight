@@ -33,7 +33,11 @@ export interface ScorecardCopy {
   currentRate: string;
   wonByLine: string;
   chartsTitle: string;
-  chartsSoon: string;
+  manhattanTitle: string;
+  wormTitle: string;
+  runRateTitle: string;
+  noChartData: string;
+  chaseProgress: string;
 }
 
 const en: ScorecardCopy = {
@@ -67,8 +71,12 @@ const en: ScorecardCopy = {
   requiredRate: 'RRR {rate}',
   currentRate: 'CRR {rate}',
   wonByLine: '{team} won {margin}',
-  chartsTitle: 'Charts (coming soon)',
-  chartsSoon: 'Manhattan and worm charts will appear here.',
+  chartsTitle: 'Analysis',
+  manhattanTitle: 'Manhattan - runs per over',
+  wormTitle: 'Worm - cumulative runs',
+  runRateTitle: 'Run rate',
+  noChartData: 'No balls bowled yet',
+  chaseProgress: '{runs} of {target}',
 };
 
 const hi: Partial<ScorecardCopy> = {
@@ -76,7 +84,7 @@ const hi: Partial<ScorecardCopy> = {
   fallOfWickets: 'Wicket ka girna',
   partnerships: 'Saajhedaari',
   needOff: 'Chahiye {runs}, {balls} ball mein',
-  chartsTitle: 'Charts (jaldi aa rahe hain)',
+  chartsTitle: 'Vishleshan',
 };
 
 export function scorecardCopy(
