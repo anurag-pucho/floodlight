@@ -244,6 +244,29 @@ describe('setup wizard', () => {
     expect(mockNewMatch.mock.calls[0][0].battingFirst).toBe('A');
   });
 
+  it.each([
+    ['tails', 0.9, 'B', 'Tails', 'T'],
+    ['heads', 0.1, 'A', 'Heads', 'H'],
+  ])('a forced %s flip lands that face and selects its team', async (_n, rnd, winner, label, letter) => {
+    await mount({ random: () => rnd });
+    await press('setup-next');
+    await fillTeam('A', 'Lions', 'Asha', 'Bo');
+    await press('setup-next');
+    await fillTeam('B', 'Tigers', 'Cy', 'Di');
+    await press('setup-next');
+    await press('setup-next');
+    // both faces render
+    expect(screen.getByText('H')).toBeTruthy();
+    expect(screen.getByText('T')).toBeTruthy();
+    await press('toss-flip');
+    expect(screen.getByTestId(`toss-winner-${winner}`).props.accessibilityState.selected).toBe(true);
+    await waitFor(() => expect(screen.getByTestId('toss-landed')).toHaveTextContent(label), {
+      timeout: 3000,
+    });
+    expect(screen.getByTestId(`toss-face-${label.toLowerCase()}`)).toBeTruthy();
+    expect(letter).toBe(label.charAt(0));
+  });
+
   it('header Home navigates to the root', async () => {
     await mount();
     await press('header-home');

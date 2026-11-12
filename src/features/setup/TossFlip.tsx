@@ -117,6 +117,11 @@ export function TossFlip({
       { rotateX: `${angle.value}deg` },
     ],
   }));
+  // backfaceVisibility is unreliable on Android, so show exactly one face by the current angle.
+  const frontFace = useAnimatedStyle(() => ({
+    opacity: Math.cos((angle.value * Math.PI) / 180) >= 0 ? 1 : 0,
+  }));
+  const backFace = useAnimatedStyle(() => ({ opacity: Math.cos((angle.value * Math.PI) / 180) < 0 ? 1 : 0 }));
   const shadow = useAnimatedStyle(() => ({
     opacity: 0.35 - Math.min(0.25, Math.abs(lift.value) / 400),
     transform: [{ scaleX: 1 + lift.value / 400 }],
@@ -165,7 +170,6 @@ export function TossFlip({
     backgroundColor: colors.gold,
     borderWidth: spacing.sm,
     borderColor: colors.surfaceAlt,
-    backfaceVisibility: 'hidden',
   } as const;
 
   const sides: { side: Side; name: string; color?: string }[] = [
@@ -207,16 +211,19 @@ export function TossFlip({
               coin,
             ]}
           >
-            <View style={face}>
+            <Animated.View testID="toss-face-heads" style={[face, frontFace]}>
               <Text variant="display" color="onPrimary">
                 {st('heads').charAt(0)}
               </Text>
-            </View>
-            <View style={[face, { transform: [{ rotateX: '180deg' }] }]}>
+            </Animated.View>
+            <Animated.View
+              testID="toss-face-tails"
+              style={[face, backFace, { transform: [{ rotateX: '180deg' }] }]}
+            >
               <Text variant="display" color="onPrimary">
                 {st('tails').charAt(0)}
               </Text>
-            </View>
+            </Animated.View>
           </Animated.View>
           <Animated.View
             style={[
