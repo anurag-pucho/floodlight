@@ -1,5 +1,8 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+// The project has no @types/node; load the two Node helpers through a typed require.
+declare const require: (id: string) => unknown;
+declare const __dirname: string;
+const { readFileSync } = require('fs') as { readFileSync: (p: string, enc: 'utf8') => string };
+const { join } = require('path') as { join: (...p: string[]) => string };
 
 const root = join(__dirname, '..', '..');
 const callers = [
