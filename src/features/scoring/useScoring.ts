@@ -49,6 +49,8 @@ export const scoringStrings = {
   outBatter: 'Who is out?',
   fielder: 'Fielder (optional)',
   noFielder: 'None',
+  capReached: 'Over cap reached - pick anyway',
+  undoLast: 'Undo last ball',
   runsCompleted: 'Runs completed',
   extraType: 'Type',
   plainRuns: 'Runs',
@@ -147,6 +149,8 @@ export interface ScoringView {
   orbs: BallGlyph[];
   batterChoices: Player[];
   bowlerChoices: Player[];
+  /** True when the over cap left nobody eligible and the list was relaxed. */
+  capHint: boolean;
   fielderChoices: Player[];
   byesEnabled: boolean;
   canUndo: boolean;
@@ -194,6 +198,44 @@ function glyphFor(e: BallRecord, short: (k: ScoringKey) => string): BallGlyph {
   return { kind: 'run', label: String(e.runsBat) };
 }
 
+interface Picks {
+  openers: { inn: 0 | 1; striker: string; non: string } | null;
+  bowlerPick: { inn: 0 | 1; id: string } | null;
+  batterPick: string | null;
+}
+
+/** Pure: who is at the crease / bowling and what is still needed, from state plus local picks. */
+function resolveLive(state: MatchState, picks: Picks) {
+  const { openers, bowlerPick, batterPick } = picks;
+  const inn = currentInningsIndex(state);
+  const events = state.events.filter((e) => e.inningsIndex === inn);
+  const legal = events.filter((e) => e.legal).length;
+  const last = events.length > 0 ? events[events.length - 1] : undefined;
+  const result = matchResult(state);
+  const crease = batsmenAtCrease(state);
+  let strikerId = crease.strikerId;
+  let nonId = crease.nonStrikerId;
+  if (events.length === 0) {
+    if (openers && openers.inn === inn) {
+      strikerId = openers.striker;
+      nonId = openers.non;
+    }
+  } else if (batterPick) {
+    if (!strikerId) strikerId = batterPick;
+    else if (!nonId) nonId = batterPick;
+  }
+  // Current bowler: whoever bowled the last ball of this over, else the pick for the new over.
+  const overIndex = Math.floor(legal / 6);
+  let bowlerId = '';
+  if (last && last.overNumber === overIndex) bowlerId = last.bowlerId;
+  else if (bowlerPick && bowlerPick.inn === inn && bowlerPick.id !== last?.bowlerId) bowlerId = bowlerPick.id;
+  const awaitingStart =
+    events.length === 0 && !(openers && openers.inn === inn && bowlerPick && bowlerPick.inn === inn);
+  const phase: Phase = result.decided ? 'result' : awaitingStart ? (inn === 1 ? 'break' : 'setup') : 'live';
+  const need: Need = phase !== 'live' ? null : !strikerId || !nonId ? 'batter' : !bowlerId ? 'bowler' : null;
+  return { inn, events, legal, last, result, strikerId, nonId, bowlerId, overIndex, phase, need };
+}
+
 export function useScoring(store: ScoringStore = matchStore): ScoringView {
   const state = useStore(store, (s) => s.state);
   const sc = useScoringT();
@@ -225,6 +267,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     orbs: [],
     batterChoices: [],
     bowlerChoices: [],
+    capHint: false,
     fielderChoices: [],
     byesEnabled: true,
     canUndo: false,
@@ -238,32 +281,12 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   };
   if (!state) return empty;
 
-  const inn = currentInningsIndex(state);
+  const picks: Picks = { openers, bowlerPick, batterPick };
+  const { inn, events, legal, last, result, strikerId, nonId, bowlerId, overIndex, phase, need } = resolveLive(
+    state,
+    picks,
+  );
   const { bat, field } = sides(state, inn);
-  const events = state.events.filter((e) => e.inningsIndex === inn);
-  const legal = events.filter((e) => e.legal).length;
-  const last = events.length > 0 ? events[events.length - 1] : undefined;
-  const result = matchResult(state);
-
-  // Who is at the crease: replayed from the log, with local picks filling the empty slots.
-  const crease = batsmenAtCrease(state);
-  let strikerId = crease.strikerId;
-  let nonId = crease.nonStrikerId;
-  if (events.length === 0) {
-    if (openers && openers.inn === inn) {
-      strikerId = openers.striker;
-      nonId = openers.non;
-    }
-  } else if (batterPick) {
-    if (!strikerId) strikerId = batterPick;
-    else if (!nonId) nonId = batterPick;
-  }
-
-  // Current bowler: whoever bowled the last ball of this over, else the pick for the new over.
-  const overIndex = Math.floor(legal / 6);
-  let bowlerId = '';
-  if (last && last.overNumber === overIndex) bowlerId = last.bowlerId;
-  else if (bowlerPick && bowlerPick.inn === inn && bowlerPick.id !== last?.bowlerId) bowlerId = bowlerPick.id;
 
   const name = (id: string): string => state.config.players[id]?.name ?? id;
   const bat0 = battingCard(state, inn);
@@ -283,10 +306,6 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
       }
     : null;
 
-  const awaitingStart = events.length === 0 && !(openers && openers.inn === inn && bowlerPick && bowlerPick.inn === inn);
-  const phase: Phase = result.decided ? 'result' : awaitingStart ? (inn === 1 ? 'break' : 'setup') : 'live';
-  const need: Need = phase !== 'live' ? null : !strikerId || !nonId ? 'batter' : !bowlerId ? 'bowler' : null;
-
   // Choices
   const out = dismissedIds(state, inn);
   const atCrease = new Set([strikerId, nonId].filter(Boolean));
@@ -296,9 +315,12 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   const eligible = fielders.filter(
     (p) => p.id !== last?.bowlerId && (cap === undefined || bowlerOversBowled(state, p.id, inn) < cap),
   );
-  const bowlerChoices = eligible.length > 0 ? eligible : fielders;
+  // Nobody eligible (tiny sides): relax the cap but never let the same bowler go twice in a row.
+  const relaxed = fielders.length > 1 ? fielders.filter((p) => p.id !== last?.bowlerId) : fielders;
+  const bowlerChoices = eligible.length > 0 ? eligible : relaxed;
+  const capHint = eligible.length === 0;
 
-  const overBalls = last ? events.filter((e) => e.overNumber === last.overNumber) : [];
+  const overBalls = events.filter((e) => e.overNumber === overIndex);
   const orbs = overBalls.map((e) => glyphFor(e, sc));
 
   const tgt = target(state);
@@ -333,18 +355,25 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     orbs,
     batterChoices,
     bowlerChoices,
+    capHint,
     fielderChoices: fielders,
     byesEnabled: state.config.rules.byesEnabled,
     canUndo: state.events.length > 0,
     canRedo: state.redo.length > 0,
     submit(part) {
-      if (phase !== 'live' || need !== null) return false;
+      // Re-derive from the live store so a rapid double-tap can't act on a stale render.
+      const fresh = store.getState().state;
+      if (!fresh) return false;
+      const cur = resolveLive(fresh, picks);
+      if (cur.phase !== 'live' || cur.need !== null) return false;
       const t = part.extra?.type;
-      if ((t === 'bye' || t === 'legbye') && !state.config.rules.byesEnabled) return false;
-      store.getState().delivery({ strikerId, nonStrikerId: nonId, bowlerId, ...part });
+      if ((t === 'bye' || t === 'legbye') && !fresh.config.rules.byesEnabled) return false;
+      store.getState().delivery({ strikerId: cur.strikerId, nonStrikerId: cur.nonId, bowlerId: cur.bowlerId, ...part });
       setBatterPick(null);
+      // The single haptic for a confirmed ball (pad buttons are silent).
       if (part.wicket) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       else if (part.runsBat === 4 || part.runsBat === 6) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      else void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       return true;
     },
     undo() {

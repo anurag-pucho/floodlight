@@ -1,9 +1,10 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, renderHook, screen } from '@testing-library/react-native';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
 import { createMatchStore } from '../../src/store/matchStore';
 import type { StoreRepo } from '../../src/store/types';
 import { teamTotal, wicketsDown } from '../../src/engine';
 import type { MatchConfig } from '../../src/engine';
+import { useScoring } from '../../src/features/scoring/useScoring';
 import ScoreScreen from '../../app/match/score';
 
 const mockPush = jest.fn();
@@ -163,5 +164,91 @@ describe('scoring screen', () => {
 
     await press('view-scorecard');
     expect(mockPush).toHaveBeenCalledWith('/match/scorecard');
+  });
+});
+
+async function playOver(bowlerId?: string) {
+  for (let i = 0; i < 6; i++) await press('run-0');
+  if (bowlerId) await press(`pick-${bowlerId}`);
+}
+
+describe('scoring screen fixes', () => {
+  it('bowler choices exclude the previous-over bowler and over-cap bowlers', async () => {
+    const { store } = setup({ oversPerInnings: 3, maxOversPerBowler: 1 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await playOver();
+    expect(screen.getByTestId('bowler-prompt')).toBeTruthy();
+    expect(screen.queryByTestId('pick-b1')).toBeNull();
+    expect(screen.getByTestId('pick-b2')).toBeTruthy();
+    expect(screen.queryByTestId('prompt-hint')).toBeNull();
+    await press('pick-b2');
+    await playOver();
+    expect(screen.queryByTestId('pick-b1')).toBeNull();
+    expect(screen.queryByTestId('pick-b2')).toBeNull();
+    expect(screen.getByTestId('pick-b3')).toBeTruthy();
+    expect(screen.getByTestId('pick-b4')).toBeTruthy();
+  });
+
+  it('when the cap leaves nobody eligible it still excludes the previous bowler and shows a hint', async () => {
+    const { store } = setup({ oversPerInnings: 5, maxOversPerBowler: 1 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await playOver();
+    await press('pick-b2');
+    await playOver();
+    await press('pick-b3');
+    await playOver();
+    await press('pick-b4');
+    await playOver();
+    expect(screen.getByTestId('prompt-hint')).toBeTruthy();
+    expect(screen.queryByTestId('pick-b4')).toBeNull();
+    expect(screen.getByTestId('pick-b1')).toBeTruthy();
+  });
+
+  it('orbs are empty once an over completes', async () => {
+    const { store } = setup({ oversPerInnings: 2 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    for (let i = 0; i < 6; i++) await press('run-0');
+    expect(screen.queryAllByTestId('orb-filled')).toHaveLength(0);
+  });
+
+  it('undo from the new-batter prompt reverts the wicket and closes the prompt', async () => {
+    const { store } = setup();
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+
+    await press('prompt-undo');
+    const s = store.getState().state!;
+    expect(s.events).toHaveLength(0);
+    expect(wicketsDown(s, 0)).toBe(0);
+    expect(screen.queryByText('Select new batter')).toBeNull();
+  });
+
+  it('a rapid double submit on the last ball of an over records only one ball', async () => {
+    const { store } = setup({ oversPerInnings: 2 });
+    const { result } = await renderHook(() => useScoring(store));
+    await act(async () => {
+      result.current.begin('a1', 'a2', 'b1');
+    });
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        result.current.submit({ runsBat: 0 });
+      });
+    }
+    let first = false;
+    let second = true;
+    await act(async () => {
+      first = result.current.submit({ runsBat: 0 });
+      second = result.current.submit({ runsBat: 0 });
+    });
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(store.getState().state!.events).toHaveLength(6);
   });
 });

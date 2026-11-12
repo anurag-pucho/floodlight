@@ -157,6 +157,7 @@ export function ExtrasSheet({ visible, byesEnabled, onConfirm, onClose }: Extras
         <TapButton
           style={{ flex: 1 }}
           testID="extras-confirm"
+          haptic="none"
           label={sc('confirm')}
           onPress={() => {
             onConfirm({ extra, runs });

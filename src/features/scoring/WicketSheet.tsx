@@ -104,6 +104,7 @@ export function WicketSheet({ visible, striker, nonStriker, fielders, freeHit, e
         <TapButton
           style={{ flex: 1 }}
           testID="wicket-confirm"
+          haptic="none"
           label={sc('confirm')}
           disabled={!canConfirm}
           onPress={() => {

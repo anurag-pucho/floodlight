@@ -41,7 +41,7 @@ export function BallPad({ disabled = false, byesEnabled, onDelivery, onWicket, o
               testID={`run-${r}`}
               label={String(r)}
               variant={r === 4 || r === 6 ? 'primary' : 'secondary'}
-              haptic={r === 4 || r === 6 ? 'medium' : 'light'}
+              haptic="none"
               disabled={disabled || (needsRuns && r === 0)}
               onPress={() => {
                 onDelivery(composeDelivery(extra, r));

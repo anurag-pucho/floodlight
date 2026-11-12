@@ -163,6 +163,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         title={sc('newBatter')}
         players={v.batterChoices}
         onPick={v.pickBatter}
+        onUndo={v.undo}
       />
       <PlayerPrompt
         testID="bowler-prompt"
@@ -170,6 +171,8 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         title={sc('selectBowler')}
         players={v.bowlerChoices}
         onPick={v.pickBowler}
+        onUndo={v.undo}
+        hint={v.capHint ? sc('capReached') : undefined}
       />
     </Screen>
   );

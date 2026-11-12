@@ -110,18 +110,28 @@ export interface PlayerPromptProps {
   title: string;
   players: Player[];
   onPick: (id: string) => void;
+  /** Escape hatch for a mis-tapped ball: reverts the last delivery. */
+  onUndo: () => void;
+  hint?: string;
   testID?: string;
 }
 
-/** Blocking prompt: choose the next batter or the next over's bowler. */
-export function PlayerPrompt({ visible, title, players, onPick, testID }: PlayerPromptProps) {
+/** Blocking prompt: choose the next batter or the next over's bowler (or undo the last ball). */
+export function PlayerPrompt({ visible, title, players, onPick, onUndo, hint, testID }: PlayerPromptProps) {
+  const sc = useScoringT();
   return (
-    <SheetFrame visible={visible} title={title} testID={testID}>
+    <SheetFrame visible={visible} title={title} onClose={onUndo} testID={testID}>
+      {hint ? (
+        <Text variant="caption" color="textSecondary" testID="prompt-hint">
+          {hint}
+        </Text>
+      ) : null}
       <ChipRow>
         {players.map((p) => (
           <Chip key={p.id} testID={`pick-${p.id}`} label={p.name} onPress={() => onPick(p.id)} />
         ))}
       </ChipRow>
+      <TapButton testID="prompt-undo" variant="ghost" label={sc('undoLast')} onPress={onUndo} />
     </SheetFrame>
   );
 }
