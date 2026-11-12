@@ -1,18 +1,26 @@
 import { BallRecord, DeliveryInput, MatchState } from './types';
-import { currentInningsIndex, legalBallCount } from './select';
+import { currentInningsIndex, isFreeHit, legalBallCount } from './select';
+import { isLegalDelivery, wicketAllowed } from './rules';
 
 const BALLS_PER_OVER = 6;
 
 export function applyDelivery(state: MatchState, input: DeliveryInput): MatchState {
+  const extraType = input.extra?.type;
+  if ((extraType === 'bye' || extraType === 'legbye') && !state.config.rules.byesEnabled) {
+    throw new Error('Byes and leg-byes are disabled for this match');
+  }
   const inningsIndex = currentInningsIndex(state);
-  const legal = true; // extras arrive in E2
+  const legal = isLegalDelivery(input);
+  const freeHit = isFreeHit(state);
   const priorLegal = legalBallCount(state, inningsIndex);
+  const { wicket, ...rest } = input;
   const record: BallRecord = {
-    ...input,
+    ...rest,
+    ...(wicket && wicketAllowed(wicket.type, input, freeHit) ? { wicket } : {}),
     id: `${state.config.id}-${state.events.length + 1}`,
     inningsIndex,
     legal,
-    freeHit: false,
+    freeHit,
     overNumber: Math.floor(priorLegal / BALLS_PER_OVER),
     ballInOver: (priorLegal % BALLS_PER_OVER) + 1,
   };
