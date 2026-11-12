@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import * as Haptics from 'expo-haptics';
 import {
+  applyRetire,
   batsmenAtCrease,
   battingCard,
   bowlerOversBowled,
@@ -85,6 +86,11 @@ export const scoringStrings = {
   milestoneFourWkts: '4-FER!',
   milestoneFiveWkts: '5-FER!',
   milestoneDismiss: 'Tap to dismiss',
+  retire: 'Retire',
+  retireTitle: 'Retire {name}',
+  retireHurt: 'Retire hurt',
+  retireOut: 'Retire out',
+  changeBowler: 'Change bowler',
 } as const;
 
 /** Hinglish overrides for the scoring copy; any missing key falls back to English. */
@@ -95,6 +101,11 @@ export const scoringStringsHi: Partial<Record<keyof typeof scoringStrings, strin
   milestoneFourWkts: '4 wicket!',
   milestoneFiveWkts: '5 wicket!',
   milestoneDismiss: 'Band karne ke liye tap karo',
+  retire: 'Retire',
+  retireTitle: '{name} retire',
+  retireHurt: 'Retire hurt',
+  retireOut: 'Retire out',
+  changeBowler: 'Gendbaaz badlo',
 };
 
 export type ScoringKey = keyof typeof scoringStrings;
@@ -202,6 +213,8 @@ export interface ScoringView {
   /** Ids of players shared between both squads (cannot open AND bowl). */
   sharedIds: string[];
   byesEnabled: boolean;
+  /** Players who may replace the bowler mid-over (same over-cap / shared-player filters). */
+  changeBowlerChoices: Player[];
   canUndo: boolean;
   canRedo: boolean;
   /** The milestone currently being celebrated (head of the queue), if any. */
@@ -213,6 +226,10 @@ export interface ScoringView {
   begin(strikerId: string, nonStrikerId: string, bowlerId: string): void;
   pickBatter(id: string): void;
   pickBowler(id: string): void;
+  /** Retire a batter at the crease (hurt = may bat again, out = a wicket); next a new batter is prompted. */
+  retire(playerId: string, out: boolean): boolean;
+  /** Replace the bowler for the rest of the current (incomplete) over. */
+  changeBowler(id: string): void;
 }
 
 function oversText(legal: number): string {
@@ -254,11 +271,13 @@ interface Picks {
   openers: { inn: 0 | 1; striker: string; non: string } | null;
   bowlerPick: { inn: 0 | 1; id: string } | null;
   batterPick: string | null;
+  /** Mid-over bowler replacement; only valid until the next delivery is logged (`at`). */
+  bowlerChange: { inn: 0 | 1; at: number; id: string } | null;
 }
 
 /** Pure: who is at the crease / bowling and what is still needed, from state plus local picks. */
 function resolveLive(state: MatchState, picks: Picks) {
-  const { openers, bowlerPick, batterPick } = picks;
+  const { openers, bowlerPick, batterPick, bowlerChange } = picks;
   const inn = currentInningsIndex(state);
   const events = state.events.filter((e) => e.inningsIndex === inn);
   const legal = events.filter((e) => e.legal).length;
@@ -271,15 +290,27 @@ function resolveLive(state: MatchState, picks: Picks) {
     if (openers && openers.inn === inn) {
       strikerId = openers.striker;
       nonId = openers.non;
+      // Retirements before the first ball act on the scorer-picked openers.
+      for (const r of state.retires ?? []) {
+        if (r.inningsIndex !== inn) continue;
+        if (strikerId === r.playerId) strikerId = '';
+        else if (nonId === r.playerId) nonId = '';
+      }
     }
-  } else if (batterPick) {
+  }
+  if (batterPick && (events.length > 0 || (openers && openers.inn === inn))) {
     if (!strikerId) strikerId = batterPick;
     else if (!nonId) nonId = batterPick;
   }
   // Current bowler: whoever bowled the last ball of this over, else the pick for the new over.
   const overIndex = Math.floor(legal / 6);
   let bowlerId = '';
-  if (last && last.overNumber === overIndex) bowlerId = last.bowlerId;
+  if (last && last.overNumber === overIndex) {
+    bowlerId =
+      bowlerChange && bowlerChange.inn === inn && bowlerChange.at === state.events.length
+        ? bowlerChange.id
+        : last.bowlerId;
+  }
   else if (bowlerPick && bowlerPick.inn === inn && bowlerPick.id !== last?.bowlerId) bowlerId = bowlerPick.id;
   const awaitingStart =
     events.length === 0 && !(openers && openers.inn === inn && bowlerPick && bowlerPick.inn === inn);
@@ -294,6 +325,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   const [openers, setOpeners] = useState<{ inn: 0 | 1; striker: string; non: string } | null>(null);
   const [bowlerPick, setBowlerPick] = useState<{ inn: 0 | 1; id: string } | null>(null);
   const [batterPick, setBatterPick] = useState<string | null>(null);
+  const [bowlerChange, setBowlerChange] = useState<Picks['bowlerChange']>(null);
 
   const [milestones, setMilestones] = useState<PendingMilestone[]>([]);
   // Keys already celebrated, so undo + re-score or a re-render never repeats a celebration.
@@ -328,6 +360,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     keeperId: undefined,
     sharedIds: [],
     byesEnabled: true,
+    changeBowlerChoices: [],
     canUndo: false,
     canRedo: false,
     milestone: null,
@@ -338,10 +371,12 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     begin: () => undefined,
     pickBatter: () => undefined,
     pickBowler: () => undefined,
+    retire: () => false,
+    changeBowler: () => undefined,
   };
   if (!state) return empty;
 
-  const picks: Picks = { openers, bowlerPick, batterPick };
+  const picks: Picks = { openers, bowlerPick, batterPick, bowlerChange };
   const { inn, events, legal, last, result, strikerId, nonId, bowlerId, overIndex, phase, need } = resolveLive(
     state,
     picks,
@@ -372,8 +407,18 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   // A shared player bowling the current (incomplete) over must finish it before he can bat.
   const midOverSharedBowler =
     last && last.overNumber === overIndex && isSharedPlayer(state.config, last.bowlerId) ? last.bowlerId : '';
+  // A batter who has just retired (no ball since) is not offered as his own replacement; retired-hurt
+  // batters are otherwise ordinary candidates because they are not in dismissedIds.
+  const justRetired = new Set(
+    (state.retires ?? []).filter((r) => r.inningsIndex === inn && r.at === state.events.length).map((r) => r.playerId),
+  );
   const batterChoices = squadPlayers(state, bat).filter(
-    (p) => !out.has(p.id) && !atCrease.has(p.id) && canSharedPlayerBat(state, p.id, inn) && p.id !== midOverSharedBowler,
+    (p) =>
+      !out.has(p.id) &&
+      !atCrease.has(p.id) &&
+      !justRetired.has(p.id) &&
+      canSharedPlayerBat(state, p.id, inn) &&
+      p.id !== midOverSharedBowler,
   );
   const cap = state.config.rules.maxOversPerBowler;
   const fielders = squadPlayers(state, field);
@@ -386,6 +431,11 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   const relaxed = bowlable.length > 1 ? bowlable.filter((p) => p.id !== last?.bowlerId) : bowlable;
   const bowlerChoices = eligible.length > 0 ? eligible : relaxed;
   const capHint = eligible.length === 0;
+  // Mid-over change: anyone allowed to bowl except the current bowler; relax the cap only if that leaves nobody.
+  const swapEligible = bowlable.filter(
+    (p) => p.id !== bowlerId && (cap === undefined || bowlerOversBowled(state, p.id, inn) < cap),
+  );
+  const changeBowlerChoices = swapEligible.length > 0 ? swapEligible : bowlable.filter((p) => p.id !== bowlerId);
 
   const overBalls = events.filter((e) => e.overNumber === overIndex);
   const orbs = overBalls.map((e) => glyphFor(e, sc));
@@ -423,12 +473,13 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     batterChoices,
     bowlerChoices,
     capHint,
+    changeBowlerChoices: phase === 'live' && need === null && !!bowlerId ? changeBowlerChoices : [],
     fielderChoices: fielders,
     keeperId: teamWicketkeeperId(state.config, bowlingSide(state, inn)),
     sharedIds: Object.keys(state.config.players).filter((id) => isSharedPlayer(state.config, id)),
     byesEnabled: state.config.rules.byesEnabled,
-    canUndo: state.events.length > 0,
-    canRedo: state.redo.length > 0,
+    canUndo: state.events.length > 0 || (state.retires?.length ?? 0) > 0,
+    canRedo: state.redo.length > 0 || (state.redoRetires?.length ?? 0) > 0,
     milestone: milestones[0] ?? null,
     dismissMilestone: () => setMilestones((q) => q.slice(1)),
     submit(part) {
@@ -460,11 +511,13 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     },
     undo() {
       clearPick();
+      setBowlerChange(null);
       setMilestones([]);
       store.getState().undo();
     },
     redo() {
       clearPick();
+      setBowlerChange(null);
       store.getState().redo();
     },
     begin(s, n, b) {
@@ -474,5 +527,22 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     },
     pickBatter: setBatterPick,
     pickBowler: (id) => setBowlerPick({ inn, id }),
+    retire(playerId, isOut) {
+      const fresh = store.getState().state;
+      if (!fresh) return false;
+      const cur = resolveLive(fresh, picks);
+      if (cur.phase !== 'live' || cur.need !== null) return false;
+      if (playerId !== cur.strikerId && playerId !== cur.nonId) return false;
+      store.setState({ state: applyRetire(fresh, { playerId, out: isOut }) });
+      setBatterPick(null);
+      return true;
+    },
+    changeBowler(id) {
+      const fresh = store.getState().state;
+      if (!fresh) return;
+      const cur = resolveLive(fresh, picks);
+      if (cur.phase !== 'live' || !cur.bowlerId) return;
+      setBowlerChange({ inn: cur.inn, at: fresh.events.length, id });
+    },
   };
 }

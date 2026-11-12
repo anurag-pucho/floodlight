@@ -465,3 +465,91 @@ describe('milestone celebrations', () => {
     expect(screen.getByText('3-FER!')).toBeTruthy();
   });
 });
+
+describe('retire and change bowler', () => {
+  it('retire hurt: batter leaves, a new batter is prompted, and he is offered again later', async () => {
+    const { store } = setup({ oversPerInnings: 3 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+
+    await press('retire-a1');
+    await press('retire-hurt');
+    const s = store.getState().state!;
+    expect(wicketsDown(s, 0)).toBe(0);
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+    expect(screen.queryByTestId('pick-a1')).toBeNull();
+    expect(screen.getByTestId('pick-a3')).toBeTruthy();
+
+    await press('pick-a3');
+    await press('run-1');
+    expect(store.getState().state!.events[0]).toMatchObject({ strikerId: 'a3', nonStrikerId: 'a2' });
+
+    // a2 now on strike after the single; get him out and check a1 is back in the list.
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+    expect(screen.getByTestId('pick-a1')).toBeTruthy();
+    expect(screen.getByTestId('pick-a4')).toBeTruthy();
+    expect(screen.queryByTestId('pick-a2')).toBeNull();
+  });
+
+  it('retire out counts as a wicket and he is not offered again', async () => {
+    const { store } = setup({ oversPerInnings: 3 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+
+    await press('retire-a1');
+    await press('retire-out');
+    expect(wicketsDown(store.getState().state!, 0)).toBe(1);
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+    expect(screen.queryByTestId('pick-a1')).toBeNull();
+    await press('pick-a3');
+    await press('run-0');
+    expect(screen.queryByTestId('pick-a1')).toBeNull();
+  });
+
+  it('undo from the new-batter prompt after a retire restores the batter', async () => {
+    const { store } = setup({ oversPerInnings: 3 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('retire-a2');
+    await press('retire-out');
+    await press('prompt-undo');
+    expect(wicketsDown(store.getState().state!, 0)).toBe(0);
+    expect(screen.queryByText('Select new batter')).toBeNull();
+    expect(screen.getByTestId('retire-a2')).toBeTruthy();
+  });
+
+  it('change bowler mid-over: the next ball records the new bowler', async () => {
+    const { store } = setup({ oversPerInnings: 3 });
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('run-0');
+    await press('change-bowler');
+    expect(screen.queryByTestId('pick-b1')).toBeNull();
+    await press('pick-b2');
+    await press('run-2');
+    const ev = store.getState().state!.events;
+    expect(ev[0].bowlerId).toBe('b1');
+    expect(ev[1]).toMatchObject({ bowlerId: 'b2', overNumber: 0, ballInOver: 2 });
+  });
+
+  it('change bowler respects the over cap and the shared-at-crease rule', async () => {
+    const { store } = setup({ oversPerInnings: 3, maxOversPerBowler: 1 }, (c) => ({
+      ...c,
+      teamA: { ...c.teamA, players: c.teamA.players.map((p) => (p.playerId === 'a2' ? { ...p, isShared: true } : p)) },
+      teamB: { ...c.teamB, players: c.teamB.players.map((p) => (p.playerId === 'b3' ? { ...p, isShared: true } : p)) },
+    }));
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await playOver('b2');
+    await press('run-0');
+    await press('change-bowler');
+    // b2 is current; b1 has used his cap of 1 over; b3/b4 remain
+    expect(screen.queryByTestId('pick-b1')).toBeNull();
+    expect(screen.queryByTestId('pick-b2')).toBeNull();
+    expect(screen.getByTestId('pick-b3')).toBeTruthy();
+    expect(screen.getByTestId('pick-b4')).toBeTruthy();
+  });
+});

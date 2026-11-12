@@ -14,6 +14,7 @@ import { CreaseStrip } from '../../src/features/scoring/CreaseStrip';
 import { ExtrasSheet } from '../../src/features/scoring/ExtrasSheet';
 import { MilestoneCelebration } from '../../src/features/scoring/MilestoneCelebration';
 import { InningsBreak, PlayerPrompt } from '../../src/features/scoring/InningsBreak';
+import { Chip, ChipRow, SheetFrame } from '../../src/features/scoring/ExtrasSheet';
 import { ResultBanner } from '../../src/features/scoring/ResultBanner';
 import { WicketSheet } from '../../src/features/scoring/WicketSheet';
 import {
@@ -36,6 +37,8 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
   const { spacing, colors, radii } = useTheme();
   const [wicket, setWicket] = useState<{ open: boolean; extra: ExtraType | null }>({ open: false, extra: null });
   const [moreOpen, setMoreOpen] = useState(false);
+  const [retireId, setRetireId] = useState<string | null>(null);
+  const [changeBowlerOpen, setChangeBowlerOpen] = useState(false);
 
   const topBar = <ScreenHeader title={sc('scoringTitle')} />;
   // Defer while a blocking new-batter/new-bowler prompt (a native Modal) is open; the timer only starts on mount.
@@ -120,7 +123,15 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
           </Text>
         ) : null}
         <OverOrbs balls={v.orbs} max={Math.max(6, v.orbs.length)} orbSize={v.orbs.length > 6 ? 30 : 38} />
-        <CreaseStrip striker={v.striker} nonStriker={v.nonStriker} bowler={v.bowler} />
+        <CreaseStrip
+          striker={v.striker}
+          nonStriker={v.nonStriker}
+          bowler={v.bowler}
+          onRetire={live && v.need === null ? setRetireId : undefined}
+          onChangeBowler={
+            live && v.need === null && v.changeBowlerChoices.length > 0 ? () => setChangeBowlerOpen(true) : undefined
+          }
+        />
         {v.phase === 'result' ? (
           <ResultBanner
             tie={v.result.tie === true}
@@ -172,6 +183,43 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
           v.submit(composeDelivery(extra, runs));
           setMoreOpen(false);
         }}
+      />
+      <SheetFrame
+        visible={retireId !== null && live && v.need === null}
+        title={sc('retireTitle', { name: [v.striker, v.nonStriker].find((l) => l?.id === retireId)?.name ?? '' })}
+        onClose={() => setRetireId(null)}
+        testID="retire-sheet"
+      >
+        <ChipRow>
+          <Chip
+            testID="retire-hurt"
+            label={sc('retireHurt')}
+            onPress={() => {
+              if (retireId) v.retire(retireId, false);
+              setRetireId(null);
+            }}
+          />
+          <Chip
+            testID="retire-out"
+            label={sc('retireOut')}
+            onPress={() => {
+              if (retireId) v.retire(retireId, true);
+              setRetireId(null);
+            }}
+          />
+        </ChipRow>
+        <TapButton testID="retire-cancel" variant="ghost" label={sc('cancel')} onPress={() => setRetireId(null)} />
+      </SheetFrame>
+      <PlayerPrompt
+        testID="change-bowler-prompt"
+        visible={changeBowlerOpen && live && v.need === null}
+        title={sc('changeBowler')}
+        players={v.changeBowlerChoices}
+        onPick={(id) => {
+          v.changeBowler(id);
+          setChangeBowlerOpen(false);
+        }}
+        onCancel={() => setChangeBowlerOpen(false)}
       />
       <PlayerPrompt
         testID="batter-prompt"

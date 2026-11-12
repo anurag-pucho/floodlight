@@ -38,10 +38,18 @@ export function applyDelivery(state: MatchState, input: DeliveryInput): MatchSta
   };
 }
 
-/** Log a retirement for the current innings. The player must be at the crease. */
+/**
+ * Log a retirement for the current innings. Once the innings has deliveries the player must be at
+ * the crease; before the first ball the openers live only in the scorer's picks, so any id is accepted.
+ */
 export function applyRetire(state: MatchState, input: { playerId: string; out: boolean }): MatchState {
+  const inningsIndex = currentInningsIndex(state);
+  const started = state.events.some(e => e.inningsIndex === inningsIndex);
   const crease = batsmenAtCrease(state);
-  if (input.playerId === '' || (crease.strikerId !== input.playerId && crease.nonStrikerId !== input.playerId)) {
+  if (
+    input.playerId === '' ||
+    (started && crease.strikerId !== input.playerId && crease.nonStrikerId !== input.playerId)
+  ) {
     throw new Error('Only a batter at the crease can retire');
   }
   const seq = state.seq + 1;

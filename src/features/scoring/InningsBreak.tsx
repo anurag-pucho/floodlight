@@ -125,16 +125,18 @@ export interface PlayerPromptProps {
   players: Player[];
   onPick: (id: string) => void;
   /** Escape hatch for a mis-tapped ball: reverts the last delivery. */
-  onUndo: () => void;
+  onUndo?: () => void;
+  /** Dismiss without choosing (used for optional prompts such as a mid-over bowler change). */
+  onCancel?: () => void;
   hint?: string;
   testID?: string;
 }
 
 /** Blocking prompt: choose the next batter or the next over's bowler (or undo the last ball). */
-export function PlayerPrompt({ visible, title, players, onPick, onUndo, hint, testID }: PlayerPromptProps) {
+export function PlayerPrompt({ visible, title, players, onPick, onUndo, onCancel, hint, testID }: PlayerPromptProps) {
   const sc = useScoringT();
   return (
-    <SheetFrame visible={visible} title={title} onClose={onUndo} testID={testID}>
+    <SheetFrame visible={visible} title={title} onClose={onCancel ?? onUndo} testID={testID}>
       {hint ? (
         <Text variant="caption" color="textSecondary" testID="prompt-hint">
           {hint}
@@ -145,7 +147,8 @@ export function PlayerPrompt({ visible, title, players, onPick, onUndo, hint, te
           <Chip key={p.id} testID={`pick-${p.id}`} label={p.name} onPress={() => onPick(p.id)} />
         ))}
       </ChipRow>
-      <TapButton testID="prompt-undo" variant="ghost" label={sc('undoLast')} onPress={onUndo} />
+      {onUndo ? <TapButton testID="prompt-undo" variant="ghost" label={sc('undoLast')} onPress={onUndo} /> : null}
+      {onCancel ? <TapButton testID="prompt-cancel" variant="ghost" label={sc('cancel')} onPress={onCancel} /> : null}
     </SheetFrame>
   );
 }
