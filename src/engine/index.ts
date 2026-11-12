@@ -9,5 +9,12 @@ export {
   teamTotal,
   batterRuns,
   bowlerConceded,
+  batsmenAtCrease,
+  dismissedIds,
+  wicketsDown,
+  bowlerWickets,
+  battingSquadSize,
+  isInningsComplete,
+  fallOfWickets,
 } from './select';
-export type { TeamExtras } from './select';
+export type { TeamExtras, FallOfWicket } from './select';

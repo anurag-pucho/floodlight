@@ -19,21 +19,87 @@ export function legalBallsInCurrentOver(state: MatchState): number {
   return legalBallCount(state, currentInningsIndex(state)) % BALLS_PER_OVER;
 }
 
-/** Id on strike for the next delivery, derived by folding the event log. */
-export function onStrikeId(state: MatchState): string {
+/**
+ * Batters at the crease after the last delivery, derived by folding the event log.
+ * Each delivery declares its own pair (so a replacement is picked up on the next
+ * delivery); a dismissed batter's slot is '' until that replacement is supplied.
+ */
+export function batsmenAtCrease(state: MatchState): { strikerId: string; nonStrikerId: string } {
   const events = inningsEvents(state, currentInningsIndex(state));
-  if (events.length === 0) return '';
-  let striker = events[0].strikerId;
-  let non = events[0].nonStrikerId;
+  let striker = '';
+  let non = '';
   let legal = 0;
   for (const e of events) {
+    striker = e.strikerId;
+    non = e.nonStrikerId;
     if (runsRun(e) % 2 === 1) [striker, non] = [non, striker];
     if (e.legal) {
       legal += 1;
       if (legal % BALLS_PER_OVER === 0) [striker, non] = [non, striker];
     }
+    if (e.wicket) {
+      if (striker === e.wicket.outPlayerId) striker = '';
+      else if (non === e.wicket.outPlayerId) non = '';
+    }
   }
-  return striker;
+  return { strikerId: striker, nonStrikerId: non };
+}
+
+/** Id on strike for the next delivery, derived by folding the event log. */
+export function onStrikeId(state: MatchState): string {
+  return batsmenAtCrease(state).strikerId;
+}
+
+export function dismissedIds(state: MatchState, inningsIndex: 0 | 1): Set<string> {
+  const out = new Set<string>();
+  for (const e of inningsEvents(state, inningsIndex)) if (e.wicket) out.add(e.wicket.outPlayerId);
+  return out;
+}
+
+export function wicketsDown(state: MatchState, inningsIndex: 0 | 1): number {
+  return inningsEvents(state, inningsIndex).filter(e => e.wicket).length;
+}
+
+/** Wickets credited to a bowler (run-outs excluded). */
+export function bowlerWickets(state: MatchState, bowlerId: string): number {
+  return state.events.filter(e => e.bowlerId === bowlerId && e.wicket && e.wicket.type !== 'runout').length;
+}
+
+export function battingSquadSize(state: MatchState, inningsIndex: 0 | 1): number {
+  const first = state.config.battingFirst === 'A' ? state.config.teamA : state.config.teamB;
+  const second = state.config.battingFirst === 'A' ? state.config.teamB : state.config.teamA;
+  return (inningsIndex === 0 ? first : second).players.length;
+}
+
+/** True when the current innings has ended (overs exhausted or all out). */
+export function isInningsComplete(state: MatchState): boolean {
+  const idx = currentInningsIndex(state);
+  const { oversPerInnings, lastManStands } = state.config.rules;
+  if (legalBallCount(state, idx) >= oversPerInnings * BALLS_PER_OVER) return true;
+  const squad = battingSquadSize(state, idx);
+  const limit = lastManStands ? squad : squad - 1;
+  return wicketsDown(state, idx) >= limit;
+}
+
+export interface FallOfWicket { wicketNo: number; score: number; over: string; outPlayerId: string; }
+
+export function fallOfWickets(state: MatchState, inningsIndex: 0 | 1): FallOfWicket[] {
+  const out: FallOfWicket[] = [];
+  let score = 0;
+  let legal = 0;
+  for (const e of inningsEvents(state, inningsIndex)) {
+    score += ballTotalRuns(e, state.config.rules);
+    if (e.legal) legal += 1;
+    if (e.wicket) {
+      out.push({
+        wicketNo: out.length + 1,
+        score,
+        over: `${Math.floor(legal / BALLS_PER_OVER)}.${legal % BALLS_PER_OVER}`,
+        outPlayerId: e.wicket.outPlayerId,
+      });
+    }
+  }
+  return out;
 }
 
 /** True iff the next legal delivery is a free hit. */
