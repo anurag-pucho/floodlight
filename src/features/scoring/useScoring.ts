@@ -5,6 +5,9 @@ import {
   batsmenAtCrease,
   battingCard,
   bowlerOversBowled,
+  bowlingSide,
+  canSharedPlayerBat,
+  canSharedPlayerBowl,
   bowlingCard,
   chaseStatus,
   currentInningsIndex,
@@ -13,6 +16,7 @@ import {
   matchResult,
   target,
   teamTotal,
+  teamWicketkeeperId,
   wicketsDown,
 } from '../../engine';
 import type {
@@ -68,6 +72,10 @@ export const scoringStrings = {
   byeShort: 'B',
   legByeShort: 'Lb',
   striker: 'Striker',
+  noBowlerShared: 'No bowler available - shared players cannot bowl while batting',
+  noBatterShared: 'No batter available - shared players cannot bat after bowling',
+  keeper: 'Keeper',
+  scoringTitle: 'Scoring',
 } as const;
 
 export type ScoringKey = keyof typeof scoringStrings;
@@ -152,6 +160,8 @@ export interface ScoringView {
   /** True when the over cap left nobody eligible and the list was relaxed. */
   capHint: boolean;
   fielderChoices: Player[];
+  /** Fielding side's wicketkeeper id (auto-filled on a stumping). */
+  keeperId: string | undefined;
   byesEnabled: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -269,6 +279,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     bowlerChoices: [],
     capHint: false,
     fielderChoices: [],
+    keeperId: undefined,
     byesEnabled: true,
     canUndo: false,
     canRedo: false,
@@ -309,14 +320,18 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   // Choices
   const out = dismissedIds(state, inn);
   const atCrease = new Set([strikerId, nonId].filter(Boolean));
-  const batterChoices = squadPlayers(state, bat).filter((p) => !out.has(p.id) && !atCrease.has(p.id));
+  const batterChoices = squadPlayers(state, bat).filter(
+    (p) => !out.has(p.id) && !atCrease.has(p.id) && canSharedPlayerBat(state, p.id, inn),
+  );
   const cap = state.config.rules.maxOversPerBowler;
   const fielders = squadPlayers(state, field);
-  const eligible = fielders.filter(
+  // A shared player who is batting this innings cannot also bowl.
+  const bowlable = fielders.filter((p) => canSharedPlayerBowl(state, p.id, inn));
+  const eligible = bowlable.filter(
     (p) => p.id !== last?.bowlerId && (cap === undefined || bowlerOversBowled(state, p.id, inn) < cap),
   );
   // Nobody eligible (tiny sides): relax the cap but never let the same bowler go twice in a row.
-  const relaxed = fielders.length > 1 ? fielders.filter((p) => p.id !== last?.bowlerId) : fielders;
+  const relaxed = bowlable.length > 1 ? bowlable.filter((p) => p.id !== last?.bowlerId) : bowlable;
   const bowlerChoices = eligible.length > 0 ? eligible : relaxed;
   const capHint = eligible.length === 0;
 
@@ -357,6 +372,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     bowlerChoices,
     capHint,
     fielderChoices: fielders,
+    keeperId: teamWicketkeeperId(state.config, bowlingSide(state, inn)),
     byesEnabled: state.config.rules.byesEnabled,
     canUndo: state.events.length > 0,
     canRedo: state.redo.length > 0,

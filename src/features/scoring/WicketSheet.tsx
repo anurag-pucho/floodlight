@@ -16,6 +16,8 @@ export interface WicketSheetProps {
   striker: CreaseLine | null;
   nonStriker: CreaseLine | null;
   fielders: Player[];
+  /** Fielding side's wicketkeeper: auto-filled on a stumping, quick-offered on a catch. */
+  keeperId?: string;
   freeHit: boolean;
   /** Modifier already selected on the pad (wide / no-ball restrict dismissals). */
   extra: ExtraType | null;
@@ -25,7 +27,7 @@ export interface WicketSheetProps {
 
 const RUN_CHOICES = [0, 1, 2, 3] as const;
 
-export function WicketSheet({ visible, striker, nonStriker, fielders, freeHit, extra, onConfirm, onClose }: WicketSheetProps) {
+export function WicketSheet({ visible, striker, nonStriker, fielders, keeperId, freeHit, extra, onConfirm, onClose }: WicketSheetProps) {
   const sc = useScoringT();
   const { spacing } = useTheme();
   const allowed = allowedWickets(freeHit, extra);
@@ -43,6 +45,12 @@ export function WicketSheet({ visible, striker, nonStriker, fielders, freeHit, e
     }
   }, [visible]);
 
+  const selectType = (w: WicketType) => {
+    setType(w);
+    // Stumped is always the keeper; any other mode clears a previous auto-fill.
+    setFielderId(w === 'stumped' && keeperId ? keeperId : null);
+  };
+
   const runOut = type === 'runout';
   const outPlayerId = runOut ? (outId ?? striker?.id ?? '') : (striker?.id ?? '');
   const canConfirm = type !== null && outPlayerId !== '';
@@ -53,7 +61,7 @@ export function WicketSheet({ visible, striker, nonStriker, fielders, freeHit, e
       <SheetSection title={sc('wicketType')}>
         <ChipRow>
           {allowed.map((w) => (
-            <Chip key={w} testID={`wicket-type-${w}`} label={sc(w)} selected={type === w} onPress={() => setType(w)} />
+            <Chip key={w} testID={`wicket-type-${w}`} label={sc(w)} selected={type === w} onPress={() => selectType(w)} />
           ))}
         </ChipRow>
       </SheetSection>
@@ -77,6 +85,14 @@ export function WicketSheet({ visible, striker, nonStriker, fielders, freeHit, e
       {usesFielder ? (
         <SheetSection title={sc('fielder')}>
           <ChipRow>
+            {type === 'caught' && keeperId ? (
+              <Chip
+                testID="wicket-keeper-quick"
+                label={sc('keeper')}
+                selected={fielderId === keeperId}
+                onPress={() => setFielderId(keeperId)}
+              />
+            ) : null}
             <Chip label={sc('noFielder')} selected={fielderId === null} onPress={() => setFielderId(null)} />
             {fielders.map((p) => (
               <Chip

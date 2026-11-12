@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme/useTheme';
 import { Screen } from '../../src/components/Screen';
 import { Surface } from '../../src/components/Surface';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { Text } from '../../src/components/Text';
 import { TapButton } from '../../src/components/TapButton';
 import { Scoreboard } from '../../src/components/Scoreboard';
@@ -35,9 +36,11 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
   const [wicket, setWicket] = useState<{ open: boolean; extra: ExtraType | null }>({ open: false, extra: null });
   const [moreOpen, setMoreOpen] = useState(false);
 
+  const topBar = <ScreenHeader title={sc('scoringTitle')} />;
+
   if (v.phase === 'none') {
     return (
-      <Screen>
+      <Screen scroll={false} header={topBar}>
         <Text variant="body" color="textSecondary">
           {sc('noMatch')}
         </Text>
@@ -45,7 +48,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
     );
   }
 
-  const header = (
+  const board = (
     <View style={{ gap: spacing.sm }}>
       <Text variant="label" color="textSecondary">
         {`${v.battingTeam} - ${sc('innings')} ${v.inningsIndex + 1}`}
@@ -56,7 +59,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
 
   if (v.phase === 'setup' || v.phase === 'break') {
     return (
-      <Screen>
+      <Screen scroll={false} header={topBar}>
         <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
           <InningsBreak
             key={`inn-${v.inningsIndex}`}
@@ -77,9 +80,9 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
 
   const live = v.phase === 'live';
   return (
-    <Screen>
+    <Screen scroll={false} header={topBar}>
       <ScrollView contentContainerStyle={{ gap: spacing.lg }}>
-        {header}
+        {board}
         {v.freeHit && live ? (
           <View
             testID="free-hit"
@@ -140,6 +143,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         striker={v.striker}
         nonStriker={v.nonStriker}
         fielders={v.fielderChoices}
+        keeperId={v.keeperId}
         freeHit={v.freeHit}
         extra={wicket.extra}
         onClose={() => setWicket({ open: false, extra: null })}
@@ -164,6 +168,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         players={v.batterChoices}
         onPick={v.pickBatter}
         onUndo={v.undo}
+        hint={v.batterChoices.length === 0 ? sc('noBatterShared') : undefined}
       />
       <PlayerPrompt
         testID="bowler-prompt"
@@ -172,7 +177,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         players={v.bowlerChoices}
         onPick={v.pickBowler}
         onUndo={v.undo}
-        hint={v.capHint ? sc('capReached') : undefined}
+        hint={v.bowlerChoices.length === 0 ? sc('noBowlerShared') : v.capHint ? sc('capReached') : undefined}
       />
     </Screen>
   );

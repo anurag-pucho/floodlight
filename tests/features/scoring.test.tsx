@@ -5,10 +5,16 @@ import type { StoreRepo } from '../../src/store/types';
 import { teamTotal, wicketsDown } from '../../src/engine';
 import type { MatchConfig } from '../../src/engine';
 import { useScoring } from '../../src/features/scoring/useScoring';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import ScoreScreen from '../../app/match/score';
 
 const mockPush = jest.fn();
-jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+const mockReplace = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn(), canGoBack: () => true }),
+}));
+
+const metrics = { frame: { x: 0, y: 0, width: 390, height: 844 }, insets: { top: 0, left: 0, right: 0, bottom: 0 } };
 
 const ids = ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3', 'b4'];
 const squad = (p: string) => [1, 2, 3, 4].map((n) => ({ playerId: `${p}${n}`, isShared: false }));
@@ -21,22 +27,24 @@ const config = (over: Partial<MatchConfig['rules']> = {}): MatchConfig => ({
   battingFirst: 'A',
 });
 
-function setup(rules: Partial<MatchConfig['rules']> = {}) {
+function setup(rules: Partial<MatchConfig['rules']> = {}, tweak?: (c: MatchConfig) => MatchConfig) {
   const repo = {
     saveMatch: jest.fn().mockResolvedValue(undefined),
     loadMatch: jest.fn().mockResolvedValue(null),
     getResumable: jest.fn().mockResolvedValue(null),
   } satisfies StoreRepo;
   const store = createMatchStore({ getRepo: () => repo, debounceMs: 5 });
-  store.getState().newMatch(config(rules));
+  store.getState().newMatch(tweak ? tweak(config(rules)) : config(rules));
   return { repo, store };
 }
 
 async function mount(store: ReturnType<typeof createMatchStore>) {
   await render(
-    <ThemeProvider>
-      <ScoreScreen store={store} />
-    </ThemeProvider>,
+    <SafeAreaProvider initialMetrics={metrics}>
+      <ThemeProvider>
+        <ScoreScreen store={store} />
+      </ThemeProvider>
+    </SafeAreaProvider>,
   );
 }
 
@@ -49,7 +57,10 @@ async function openInnings(strikerId: string, nonId: string, bowlerId: string) {
   await press('start-innings');
 }
 
-beforeEach(() => mockPush.mockClear());
+beforeEach(() => {
+  mockPush.mockClear();
+  mockReplace.mockClear();
+});
 
 describe('scoring screen', () => {
   it('tapping 4 records bat runs and updates total and orbs', async () => {
@@ -250,5 +261,74 @@ describe('scoring screen fixes', () => {
     expect(first).toBe(true);
     expect(second).toBe(false);
     expect(store.getState().state!.events).toHaveLength(6);
+  });
+
+  it('header Home navigates to the home route', async () => {
+    const { store } = setup();
+    await mount(store);
+    await press('header-home');
+    expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+});
+
+describe('shared players and keeper', () => {
+  /** Adds shared player "s1" to both squads (and optionally marks b2 as Bravo's keeper). */
+  const withShared = (c: MatchConfig): MatchConfig => ({
+    ...c,
+    teamA: { ...c.teamA, players: [...c.teamA.players, { playerId: 's1', isShared: true }] },
+    teamB: {
+      ...c.teamB,
+      players: [
+        ...c.teamB.players.map((p) => (p.playerId === 'b2' ? { ...p, isWicketkeeper: true } : p)),
+        { playerId: 's1', isShared: true },
+      ],
+    },
+    players: { ...c.players, s1: { id: 's1', name: 'P-s1' } },
+  });
+
+  it('a shared player who is batting is not offered as bowler; a non-shared player is', async () => {
+    const { store } = setup({ oversPerInnings: 3 }, withShared);
+    await mount(store);
+    await openInnings('a1', 's1', 'b1');
+    await playOver();
+    expect(screen.getByTestId('bowler-prompt')).toBeTruthy();
+    expect(screen.queryByTestId('pick-s1')).toBeNull();
+    expect(screen.getByTestId('pick-b2')).toBeTruthy();
+  });
+
+  it('a shared player who has bowled this innings is not offered as a new batter', async () => {
+    const { store } = setup({ oversPerInnings: 3 }, withShared);
+    await mount(store);
+    await openInnings('a1', 'a2', 's1');
+    await playOver();
+    await press('pick-b1');
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    expect(screen.getByText('Select new batter')).toBeTruthy();
+    expect(screen.queryByTestId('pick-s1')).toBeNull();
+    expect(screen.getByTestId('pick-a3')).toBeTruthy();
+  });
+
+  it('selecting stumped pre-fills the wicketkeeper as fielder', async () => {
+    const { store } = setup({}, withShared);
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('wicket');
+    await press('wicket-type-stumped');
+    await press('wicket-confirm');
+    expect(store.getState().state!.events[0].wicket).toMatchObject({ type: 'stumped', fielderId: 'b2' });
+  });
+
+  it('caught offers the keeper as a quick option but allows any fielder', async () => {
+    const { store } = setup({}, withShared);
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('wicket');
+    await press('wicket-type-caught');
+    expect(screen.getByTestId('wicket-keeper-quick')).toBeTruthy();
+    await press('wicket-fielder-b3');
+    await press('wicket-confirm');
+    expect(store.getState().state!.events[0].wicket).toMatchObject({ type: 'caught', fielderId: 'b3' });
   });
 });
