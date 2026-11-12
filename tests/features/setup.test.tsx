@@ -247,24 +247,99 @@ describe('setup wizard', () => {
   it.each([
     ['tails', 0.9, 'B', 'Tails', 'T'],
     ['heads', 0.1, 'A', 'Heads', 'H'],
-  ])('a forced %s flip lands that face and selects its team', async (_n, rnd, winner, label, letter) => {
-    await mount({ random: () => rnd });
+  ])(
+    'a forced %s flip lands that face and selects its team',
+    async (_n, rnd, winner, label, letter) => {
+      await mount({ random: () => rnd });
+      await press('setup-next');
+      await fillTeam('A', 'Lions', 'Asha', 'Bo');
+      await press('setup-next');
+      await fillTeam('B', 'Tigers', 'Cy', 'Di');
+      await press('setup-next');
+      await press('setup-next');
+      // both faces render
+      expect(screen.getByText('H')).toBeTruthy();
+      expect(screen.getByText('T')).toBeTruthy();
+      await press('toss-flip');
+      expect(screen.getByTestId(`toss-winner-${winner}`).props.accessibilityState.selected).toBe(
+        true,
+      );
+      await waitFor(() => expect(screen.getByTestId('toss-landed')).toHaveTextContent(label), {
+        timeout: 3000,
+      });
+      expect(screen.getByTestId(`toss-face-${label.toLowerCase()}`)).toBeTruthy();
+      expect(letter).toBe(label.charAt(0));
+    },
+  );
+
+  it('moves a player to the other team, dropping their captain mark', async () => {
+    await mount();
     await press('setup-next');
     await fillTeam('A', 'Lions', 'Asha', 'Bo');
+    await press('teamA-0-captain');
+    await press('teamA-move-0');
+    expect(screen.getByTestId('teamA-player-0').props.value).toBe('Bo');
+    expect(screen.queryByTestId('teamA-player-1')).toBeNull();
+    expect(screen.getByTestId('teamA-0-captain').props.accessibilityState.selected).toBe(false);
+    await press('teamA-add');
+    await type('teamA-player-1', 'Ed');
     await press('setup-next');
     await fillTeam('B', 'Tigers', 'Cy', 'Di');
+    expect(screen.getByTestId('teamB-player-2').props.value).toBe('Asha');
+    expect(screen.getByTestId('teamB-2-captain').props.accessibilityState.selected).toBe(false);
     await press('setup-next');
     await press('setup-next');
-    // both faces render
-    expect(screen.getByText('H')).toBeTruthy();
-    expect(screen.getByText('T')).toBeTruthy();
-    await press('toss-flip');
-    expect(screen.getByTestId(`toss-winner-${winner}`).props.accessibilityState.selected).toBe(true);
-    await waitFor(() => expect(screen.getByTestId('toss-landed')).toHaveTextContent(label), {
-      timeout: 3000,
-    });
-    expect(screen.getByTestId(`toss-face-${label.toLowerCase()}`)).toBeTruthy();
-    expect(letter).toBe(label.charAt(0));
+    await press('toss-winner-A');
+    await press('toss-choice-bat');
+    await press('setup-start');
+    const config = mockNewMatch.mock.calls[0][0];
+    const names = (t: { players: { playerId: string }[] }): string[] =>
+      t.players.map((p) => config.players[p.playerId].name);
+    expect(names(config.teamA)).toEqual(['Bo', 'Ed']);
+    expect(names(config.teamB)).toEqual(['Cy', 'Di', 'Asha']);
+    expect(config.teamA.players.some((p: { isCaptain?: boolean }) => p.isCaptain)).toBe(false);
+  });
+
+  it('offers previous-player names, filters as you type and fills the field on pick', async () => {
+    const config = {
+      players: {
+        p1: { id: 'p1', name: 'Ravi' },
+        p2: { id: 'p2', name: 'Raj' },
+        p3: { id: 'p3', name: 'Uma' },
+      },
+    };
+    const repo = {
+      listMatches: jest.fn().mockResolvedValue([
+        {
+          id: 'm1',
+          teamAName: 'R',
+          teamBName: 'K',
+          overs: 10,
+          status: 'complete',
+          updatedAt: 5,
+        },
+      ]),
+      loadMatch: jest.fn().mockResolvedValue({
+        config,
+        events: [],
+        redo: [],
+        seq: 0,
+      } as unknown as MatchState),
+    };
+    await mount({ repo });
+    await press('setup-next');
+    fireEvent(screen.getByTestId('teamA-player-0'), 'focus');
+    await waitFor(() => expect(screen.getByTestId('teamA-suggestion-0-ravi')).toBeTruthy());
+    expect(screen.getByTestId('teamA-suggestion-0-uma')).toBeTruthy();
+    await type('teamA-player-0', 'ra');
+    expect(screen.queryByTestId('teamA-suggestion-0-uma')).toBeNull();
+    expect(screen.getByTestId('teamA-suggestion-0-raj')).toBeTruthy();
+    await press('teamA-suggestion-0-ravi');
+    expect(screen.getByTestId('teamA-player-0').props.value).toBe('Ravi');
+    expect(screen.queryByTestId('teamA-suggestions-0')).toBeNull();
+    // a brand-new name still types freely
+    await type('teamA-player-1', 'Zed');
+    expect(screen.getByTestId('teamA-player-1').props.value).toBe('Zed');
   });
 
   it('header Home navigates to the root', async () => {

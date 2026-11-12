@@ -1,3 +1,5 @@
+import { knownPlayerNames, movePlayer } from '../../src/features/setup/squadTools';
+import type { MatchConfig } from '../../src/engine';
 import {
   buildConfig,
   validateSetup,
@@ -160,5 +162,53 @@ describe('captain and wicketkeeper', () => {
       players: ['Cy', 'Di'],
       wicketkeeper: 'Sam',
     });
+  });
+});
+
+describe('movePlayer', () => {
+  const teams = () => ({
+    teamA: {
+      name: 'A',
+      color: '#1',
+      players: ['Asha', 'Bo'],
+      captain: 'Asha',
+      wicketkeeper: 'bo',
+    },
+    teamB: { name: 'B', color: '#2', players: ['Cy'], captain: 'Cy' },
+  });
+
+  it('moves A to B, clears the moved player roles and leaves the rest', () => {
+    const out = movePlayer(teams(), 'A', 0);
+    expect(out.teamA.players).toEqual(['Bo']);
+    expect(out.teamA.captain).toBeUndefined();
+    expect(out.teamA.wicketkeeper).toBe('bo');
+    expect(out.teamB.players).toEqual(['Cy', 'Asha']);
+    expect(out.teamB.captain).toBe('Cy');
+  });
+
+  it('moves B to A and ignores blank or out-of-range entries', () => {
+    const t = teams();
+    const out = movePlayer(t, 'B', 0);
+    expect(out.teamB.players).toEqual([]);
+    expect(out.teamB.captain).toBeUndefined();
+    expect(out.teamA.players).toEqual(['Asha', 'Bo', 'Cy']);
+    expect(movePlayer(t, 'A', 9)).toBe(t);
+    expect(
+      movePlayer({ ...t, teamA: { ...t.teamA, players: [' '] } }, 'A', 0).teamB.players,
+    ).toEqual(['Cy']);
+  });
+});
+
+describe('knownPlayerNames', () => {
+  const match = (...names: string[]) => ({
+    config: {
+      players: Object.fromEntries(names.map((n, i) => [`p${i}`, { id: `p${i}`, name: n }])),
+    } as unknown as MatchConfig,
+  });
+
+  it('dedupes case-insensitively across matches and sorts', () => {
+    expect(knownPlayerNames([match('Zed', 'asha', 'Bo'), match('Asha', ' bo ', 'Cy', '')])).toEqual(
+      ['asha', 'Bo', 'Cy', 'Zed'],
+    );
   });
 });

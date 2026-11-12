@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen } from '../../src/components/Screen';
@@ -24,6 +24,7 @@ import {
 } from '../../src/features/setup/buildConfig';
 import { RuleToggles } from '../../src/features/setup/RuleToggles';
 import { openSavedMatchSource, type SavedMatchSource } from '../../src/features/setup/savedMatches';
+import { loadKnownPlayerNames, movePlayer } from '../../src/features/setup/squadTools';
 import { SquadEditor } from '../../src/features/setup/SquadEditor';
 import { TossFlip } from '../../src/features/setup/TossFlip';
 import { useSetupT, type SetupStrings } from '../../src/features/setup/setupStrings';
@@ -79,6 +80,23 @@ export function SetupScreen({ repo, random }: SetupScreenProps) {
   const [toss, setToss] = useState<Partial<TossInput>>({});
   const [picker, setPicker] = useState<MatchSummary[] | 'loading' | null>(null);
   const [loadedFromPrevious, setLoadedFromPrevious] = useState(false);
+  const [knownNames, setKnownNames] = useState<string[]>([]);
+
+  // Previous-player suggestions load lazily the first time a squad step is reached.
+  const onSquadStep = STEPS[step] === 'teamA' || STEPS[step] === 'teamB';
+  useEffect(() => {
+    if (!onSquadStep) return;
+    let live = true;
+    (repo ? Promise.resolve(repo) : openSavedMatchSource())
+      .then(loadKnownPlayerNames)
+      .then((names) => {
+        if (live) setKnownNames(names);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [onSquadStep, repo]);
 
   const openPicker = (): void => {
     setPicker('loading');
@@ -112,7 +130,8 @@ export function SetupScreen({ repo, random }: SetupScreenProps) {
         next.forEach((name, i) => {
           const old = shared[i];
           if (old === name) return;
-          if (out.captain && nameKey(out.captain) === nameKey(old)) out = { ...out, captain: name.trim() };
+          if (out.captain && nameKey(out.captain) === nameKey(old))
+            out = { ...out, captain: name.trim() };
           if (out.wicketkeeper && nameKey(out.wicketkeeper) === nameKey(old))
             out = { ...out, wicketkeeper: name.trim() };
         });
@@ -234,6 +253,15 @@ export function SetupScreen({ repo, random }: SetupScreenProps) {
         players={team.players}
         onChange={(players, marks) => setTeam({ ...team, players, ...(marks ?? {}) })}
         testIDPrefix={`team${side}`}
+        knownNames={knownNames}
+        moveTargetName={
+          (side === 'A' ? teamB : teamA).name.trim() || st(side === 'A' ? 'stepTeamB' : 'stepTeamA')
+        }
+        onMove={(index) => {
+          const moved = movePlayer({ teamA, teamB }, side, index);
+          setTeamA(moved.teamA);
+          setTeamB(moved.teamB);
+        }}
         roles={{
           shared,
           captain: team.captain,

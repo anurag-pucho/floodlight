@@ -57,6 +57,8 @@ const en = {
   flipAgain: 'Flip again',
   tossBatOrBowl: 'Bat or bowl?',
   battingFirst: 'bats first',
+  moveTo: 'Move to',
+  previousPlayers: 'Previous players',
 } as const;
 
 export type SetupStrings = typeof en;

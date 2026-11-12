@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 import { Text } from '../../components/Text';
 import { TapButton } from '../../components/TapButton';
 import { useTheme } from '../../theme/useTheme';
 import { nameKey } from './buildConfig';
 import { useSetupT } from './setupStrings';
+import { filterSuggestions } from './squadTools';
 
 export interface RoleMarks {
   captain?: string;
@@ -23,11 +25,26 @@ export interface SquadEditorProps {
   testIDPrefix: string;
   /** When given, each row gets Captain (C) / Wicketkeeper (WK) chips. */
   roles?: SquadRoles;
+  /** When given, each own player row gets a control that sends the player to the other team. */
+  onMove?: (index: number) => void;
+  /** Name of the other team, shown in the move control. */
+  moveTargetName?: string;
+  /** Player names from previous matches offered while typing a name. */
+  knownNames?: readonly string[];
 }
 
-export function SquadEditor({ players, onChange, testIDPrefix, roles }: SquadEditorProps) {
+export function SquadEditor({
+  players,
+  onChange,
+  testIDPrefix,
+  roles,
+  onMove,
+  moveTargetName,
+  knownNames,
+}: SquadEditorProps) {
   const { colors, spacing, radii, typography, elevation } = useTheme();
   const st = useSetupT();
+  const [focused, setFocused] = useState<number | null>(null);
 
   const isMarked = (mark: string | undefined, name: string): boolean =>
     mark !== undefined && name.trim().length > 0 && nameKey(mark) === nameKey(name);
@@ -84,6 +101,30 @@ export function SquadEditor({ players, onChange, testIDPrefix, roles }: SquadEdi
     wicketkeeper: roles?.wicketkeeper,
   };
 
+  const rename = (i: number, v: string): void => {
+    const name = players[i] ?? '';
+    const next = players.map((p, j) => (j === i ? v : p));
+    // A renamed C / WK keeps its mark.
+    const renamed = (m: string | undefined): string | undefined =>
+      isMarked(m, name) ? v.trim() : m;
+    if (roles && (isMarked(marks.captain, name) || isMarked(marks.wicketkeeper, name))) {
+      onChange(next, {
+        captain: renamed(marks.captain),
+        wicketkeeper: renamed(marks.wicketkeeper),
+      });
+    } else {
+      onChange(next);
+    }
+  };
+
+  const suggestionsFor = (i: number): string[] =>
+    knownNames
+      ? filterSuggestions(knownNames, players[i] ?? '', [
+          ...players.filter((_, j) => j !== i),
+          ...(roles?.shared ?? []),
+        ])
+      : [];
+
   const roleChips = (idPrefix: string, name: string, onMarks: (m: RoleMarks) => void) => (
     <View style={{ flexDirection: 'row', gap: spacing.xs }}>
       {chip(
@@ -135,73 +176,112 @@ export function SquadEditor({ players, onChange, testIDPrefix, roles }: SquadEdi
         </View>
       ) : null}
       {players.map((name, i) => (
-        <View
-          key={i}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing.sm,
-          }}
-        >
-          <Text variant="numeric" color="textMuted" style={{ width: spacing['2xl'] }}>
-            {i + 1}
-          </Text>
-          <TextInput
-            testID={`${testIDPrefix}-player-${i}`}
-            accessibilityLabel={st('playerName')}
-            placeholder={st('playerName')}
-            placeholderTextColor={colors.textMuted}
-            value={name}
-            onChangeText={(v) => {
-              const next = players.map((p, j) => (j === i ? v : p));
-              // A renamed C / WK keeps its mark.
-              const renamed = (m: string | undefined): string | undefined =>
-                isMarked(m, name) ? v.trim() : m;
-              if (roles && (isMarked(marks.captain, name) || isMarked(marks.wicketkeeper, name))) {
-                onChange(next, {
-                  captain: renamed(marks.captain),
-                  wicketkeeper: renamed(marks.wicketkeeper),
-                });
-              } else {
-                onChange(next);
+        <View key={i} style={{ gap: spacing.xs }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <Text variant="numeric" color="textMuted" style={{ width: spacing['2xl'] }}>
+              {i + 1}
+            </Text>
+            <TextInput
+              testID={`${testIDPrefix}-player-${i}`}
+              accessibilityLabel={st('playerName')}
+              placeholder={st('playerName')}
+              placeholderTextColor={colors.textMuted}
+              value={name}
+              onChangeText={(v) => rename(i, v)}
+              onFocus={() => setFocused(i)}
+              onSubmitEditing={() => setFocused(null)}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                color: colors.textPrimary,
+                backgroundColor: colors.surfaceAlt,
+                borderRadius: radii.md,
+                borderWidth: elevation.hairlineWidth,
+                borderColor: colors.hairline,
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+                fontFamily: typography.body.fontFamily,
+                fontSize: typography.body.fontSize,
+              }}
+            />
+            {roles ? roleChips(`${testIDPrefix}-${i}`, name, (m) => onChange(players, m)) : null}
+            <TapButton
+              testID={`${testIDPrefix}-remove-${i}`}
+              label={st('removePlayer')}
+              variant="ghost"
+              haptic="none"
+              onPress={() =>
+                onChange(
+                  players.filter((_, j) => j !== i),
+                  roles
+                    ? {
+                        captain: isMarked(marks.captain, name) ? undefined : marks.captain,
+                        wicketkeeper: isMarked(marks.wicketkeeper, name)
+                          ? undefined
+                          : marks.wicketkeeper,
+                      }
+                    : undefined,
+                )
               }
-            }}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              color: colors.textPrimary,
-              backgroundColor: colors.surfaceAlt,
-              borderRadius: radii.md,
-              borderWidth: elevation.hairlineWidth,
-              borderColor: colors.hairline,
-              paddingHorizontal: spacing.md,
-              paddingVertical: spacing.sm,
-              fontFamily: typography.body.fontFamily,
-              fontSize: typography.body.fontSize,
-            }}
-          />
-          {roles ? roleChips(`${testIDPrefix}-${i}`, name, (m) => onChange(players, m)) : null}
-          <TapButton
-            testID={`${testIDPrefix}-remove-${i}`}
-            label={st('removePlayer')}
-            variant="ghost"
-            haptic="none"
-            onPress={() =>
-              onChange(
-                players.filter((_, j) => j !== i),
-                roles
-                  ? {
-                      captain: isMarked(marks.captain, name) ? undefined : marks.captain,
-                      wicketkeeper: isMarked(marks.wicketkeeper, name) ? undefined : marks.wicketkeeper,
-                    }
-                  : undefined,
-              )
-            }
-            style={{
-              paddingVertical: spacing.sm,
-              paddingHorizontal: spacing.md,
-            }}
-          />
+              style={{
+                paddingVertical: spacing.sm,
+                paddingHorizontal: spacing.md,
+              }}
+            />
+          </View>
+          {onMove && name.trim().length > 0 ? (
+            <TapButton
+              testID={`${testIDPrefix}-move-${i}`}
+              label={`${st('moveTo')} ${moveTargetName ?? ''}`.trim()}
+              variant="ghost"
+              haptic="none"
+              onPress={() => onMove(i)}
+              style={{ alignSelf: 'flex-start' }}
+            />
+          ) : null}
+          {focused === i && suggestionsFor(i).length > 0 ? (
+            <View style={{ gap: spacing.xs }} testID={`${testIDPrefix}-suggestions-${i}`}>
+              <Text variant="caption" color="textSecondary">
+                {st('previousPlayers')}
+              </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: spacing.xs,
+                }}
+              >
+                {suggestionsFor(i).map((n) => (
+                  <Pressable
+                    key={n}
+                    testID={`${testIDPrefix}-suggestion-${i}-${nameKey(n)}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={n}
+                    onPress={() => {
+                      rename(i, n);
+                      setFocused(null);
+                    }}
+                    style={{
+                      paddingHorizontal: spacing.md,
+                      paddingVertical: spacing.sm,
+                      borderRadius: radii.pill,
+                      backgroundColor: colors.surfaceAlt,
+                      borderWidth: elevation.hairlineWidth,
+                      borderColor: colors.hairline,
+                    }}
+                  >
+                    <Text variant="label">{n}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
       ))}
       <TapButton
