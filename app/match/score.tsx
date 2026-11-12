@@ -70,6 +70,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
             battingTeam={v.battingTeam}
             batters={v.batterChoices}
             bowlers={v.bowlerChoices}
+            sharedIds={v.sharedIds}
             onStart={v.begin}
             onUndo={v.canUndo ? v.undo : undefined}
           />

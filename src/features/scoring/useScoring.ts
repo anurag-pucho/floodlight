@@ -8,6 +8,7 @@ import {
   bowlingSide,
   canSharedPlayerBat,
   canSharedPlayerBowl,
+  isSharedPlayer,
   bowlingCard,
   chaseStatus,
   currentInningsIndex,
@@ -162,6 +163,8 @@ export interface ScoringView {
   fielderChoices: Player[];
   /** Fielding side's wicketkeeper id (auto-filled on a stumping). */
   keeperId: string | undefined;
+  /** Ids of players shared between both squads (cannot open AND bowl). */
+  sharedIds: string[];
   byesEnabled: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -280,6 +283,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     capHint: false,
     fielderChoices: [],
     keeperId: undefined,
+    sharedIds: [],
     byesEnabled: true,
     canUndo: false,
     canRedo: false,
@@ -373,6 +377,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     capHint,
     fielderChoices: fielders,
     keeperId: teamWicketkeeperId(state.config, bowlingSide(state, inn)),
+    sharedIds: Object.keys(state.config.players).filter((id) => isSharedPlayer(state.config, id)),
     byesEnabled: state.config.rules.byesEnabled,
     canUndo: state.events.length > 0,
     canRedo: state.redo.length > 0,

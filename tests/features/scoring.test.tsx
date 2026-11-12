@@ -331,4 +331,36 @@ describe('shared players and keeper', () => {
     await press('wicket-confirm');
     expect(store.getState().state!.events[0].wicket).toMatchObject({ type: 'caught', fielderId: 'b3' });
   });
+
+  it('a shared opener cannot also be the opening bowler, and vice versa', async () => {
+    const { store } = setup({}, withShared);
+    await mount(store);
+    await press('open-striker-s1');
+    await press('open-non-a2');
+    await press('open-bowler-s1');
+    await press('start-innings');
+    expect(screen.getByTestId('innings-break')).toBeTruthy();
+    expect(store.getState().state!.events).toHaveLength(0);
+    // Reverse: bowler first, then he cannot be picked as an opener.
+    await press('open-striker-a1');
+    await press('open-bowler-s1');
+    await press('open-striker-s1');
+    await press('open-non-s1');
+    await press('open-non-a2');
+    await press('open-bowler-b1');
+    await press('start-innings');
+    expect(store.getState().state!.events).toHaveLength(0);
+    await press('run-1');
+    expect(store.getState().state!.events[0]).toMatchObject({ bowlerId: 'b1' });
+  });
+
+  it('stumped with no wicketkeeper leaves the fielder empty', async () => {
+    const { store } = setup();
+    await mount(store);
+    await openInnings('a1', 'a2', 'b1');
+    await press('wicket');
+    await press('wicket-type-stumped');
+    await press('wicket-confirm');
+    expect(store.getState().state!.events[0].wicket?.fielderId).toBeUndefined();
+  });
 });

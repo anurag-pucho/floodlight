@@ -15,6 +15,8 @@ export interface InningsBreakProps {
   battingTeam: string;
   batters: Player[];
   bowlers: Player[];
+  /** Shared players: can't be an opener and the opening bowler at once. */
+  sharedIds?: string[];
   onStart: (strikerId: string, nonStrikerId: string, bowlerId: string) => void;
   onUndo?: () => void;
 }
@@ -28,6 +30,7 @@ export function InningsBreak({
   battingTeam,
   batters,
   bowlers,
+  sharedIds = [],
   onStart,
   onUndo,
 }: InningsBreakProps) {
@@ -36,6 +39,11 @@ export function InningsBreak({
   const [striker, setStriker] = useState<string | null>(null);
   const [non, setNon] = useState<string | null>(null);
   const [bowler, setBowler] = useState<string | null>(null);
+  const isShared = (id: string): boolean => sharedIds.includes(id);
+  const opens = (id: string): boolean => striker === id || non === id;
+  const batterBlocked = (id: string): boolean => isShared(id) && bowler === id;
+  const bowlerBlocked = (id: string): boolean => isShared(id) && opens(id);
+  const noBowlers = bowlers.length > 0 && bowlers.every((p) => bowlerBlocked(p.id));
   const ready = striker !== null && non !== null && bowler !== null && striker !== non;
 
   return (
@@ -59,7 +67,7 @@ export function InningsBreak({
               testID={`open-striker-${p.id}`}
               label={p.name}
               selected={striker === p.id}
-              disabled={non === p.id}
+              disabled={non === p.id || batterBlocked(p.id)}
               onPress={() => setStriker(p.id)}
             />
           ))}
@@ -73,13 +81,18 @@ export function InningsBreak({
               testID={`open-non-${p.id}`}
               label={p.name}
               selected={non === p.id}
-              disabled={striker === p.id}
+              disabled={striker === p.id || batterBlocked(p.id)}
               onPress={() => setNon(p.id)}
             />
           ))}
         </ChipRow>
       </SheetSection>
       <SheetSection title={sc('bowler')}>
+        {noBowlers ? (
+          <Text variant="caption" color="textSecondary" testID="open-bowler-hint">
+            {sc('noBowlerShared')}
+          </Text>
+        ) : null}
         <ChipRow>
           {bowlers.map((p) => (
             <Chip
@@ -87,6 +100,7 @@ export function InningsBreak({
               testID={`open-bowler-${p.id}`}
               label={p.name}
               selected={bowler === p.id}
+              disabled={bowlerBlocked(p.id)}
               onPress={() => setBowler(p.id)}
             />
           ))}
