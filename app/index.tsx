@@ -1,67 +1,63 @@
-import { useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../src/theme/useTheme';
 import { useT } from '../src/i18n/useT';
 import { Screen } from '../src/components/Screen';
 import { Surface } from '../src/components/Surface';
 import { Text } from '../src/components/Text';
 import { TapButton } from '../src/components/TapButton';
-import { CricketBall } from '../src/components/CricketBall';
-import { OverOrbs, type BallGlyph } from '../src/components/OverOrbs';
-import { Scoreboard } from '../src/components/Scoreboard';
+import { HomeHero } from '../src/features/home/HomeHero';
+import { homeCopy } from '../src/features/home/copy';
+import { matchStore } from '../src/store/matchStore';
 
-const SEQUENCE: BallGlyph[] = [
-  { kind: 'run', label: '1' },
-  { kind: 'dot' },
-  { kind: 'four' },
-  { kind: 'six' },
-  { kind: 'wicket' },
-  { kind: 'extra', label: 'Wd' },
-];
+export interface HomeScreenProps {
+  /** Loads a resumable match into the store; resolves true when one exists. Injectable for tests. */
+  checkResumable?: () => Promise<boolean>;
+}
 
-export default function Index() {
+const defaultCheck = (): Promise<boolean> => matchStore.getState().resume();
+
+export function HomeScreen({ checkResumable = defaultCheck }: HomeScreenProps) {
+  const router = useRouter();
   const { spacing } = useTheme();
-  const { t, lang, setLang } = useT();
-  const [runs, setRuns] = useState(186);
-  const [wickets, setWickets] = useState(4);
-  const [balls, setBalls] = useState<BallGlyph[]>(SEQUENCE.slice(0, 3));
+  const { t, lang } = useT();
+  const [canResume, setCanResume] = useState(false);
 
-  const bowl = () => {
-    const next = SEQUENCE[balls.length % SEQUENCE.length] as BallGlyph;
-    const add = next.kind === 'four' ? 4 : next.kind === 'six' ? 6 : next.kind === 'run' ? 1 : next.kind === 'extra' ? 1 : 0;
-    setRuns((r) => r + add);
-    if (next.kind === 'wicket') setWickets((w) => Math.min(10, w + 1));
-    setBalls((b) => (b.length >= 6 ? [next] : [...b, next]));
-  };
+  useEffect(() => {
+    let alive = true;
+    checkResumable()
+      .then((found) => {
+        if (alive) setCanResume(found);
+      })
+      .catch(() => {
+        if (alive) setCanResume(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [checkResumable]);
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ gap: spacing.xl, paddingVertical: spacing.lg }}>
-        <Text variant="label" color="primary" style={{ letterSpacing: 2 }}>
-          {t('appName').toUpperCase()}
-        </Text>
-        <Text variant="body" color="textSecondary">
-          {t('tagline')}
-        </Text>
-
-        <Surface gradient elevation="medium">
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Scoreboard runs={runs} wickets={wickets} overs={`${Math.floor(balls.length / 6) + 18}.${balls.length % 6}`} />
-            <CricketBall size={72} />
-          </View>
-        </Surface>
-
-        <Surface>
-          <OverOrbs balls={balls} />
-        </Surface>
-
-        <TapButton label={t('newMatch')} onPress={bowl} haptic="medium" />
-        <TapButton
-          variant="secondary"
-          label={lang === 'en' ? 'हिन्दी' : 'English'}
-          onPress={() => setLang(lang === 'en' ? 'hi' : 'en')}
-        />
+        <HomeHero />
+        {canResume ? (
+          <Surface elevation="medium" testID="resume-card">
+            <Text variant="heading">{t('resume')}</Text>
+            <Text variant="body" color="textSecondary" style={{ marginBottom: spacing.md }}>
+              {homeCopy('resumeSub', lang)}
+            </Text>
+            <TapButton label={t('resume')} onPress={() => router.push('/match/score')} haptic="medium" />
+          </Surface>
+        ) : null}
+        <TapButton label={t('newMatch')} onPress={() => router.push('/match/setup')} haptic="medium" />
+        <TapButton variant="secondary" label={homeCopy('matches', lang)} onPress={() => router.push('/matches')} />
       </ScrollView>
     </Screen>
   );
+}
+
+export default function Index() {
+  return <HomeScreen />;
 }
