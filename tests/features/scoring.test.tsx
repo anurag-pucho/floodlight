@@ -390,3 +390,56 @@ describe('shared players and keeper', () => {
     expect(store.getState().state!.events[0].wicket?.fielderId).toBeUndefined();
   });
 });
+
+describe('milestone celebrations', () => {
+  const seed = (store: ReturnType<typeof createMatchStore>, balls: { striker: string; non: string; runs: number; out?: boolean }[]) => {
+    for (const b of balls) {
+      store.getState().delivery({
+        strikerId: b.striker,
+        nonStrikerId: b.non,
+        bowlerId: 'b1',
+        runsBat: b.runs,
+        ...(b.out ? { wicket: { type: 'bowled' as const, outPlayerId: b.striker } } : {}),
+      });
+    }
+  };
+  const sixes = Array.from({ length: 8 }, () => ({ striker: 'a1', non: 'a2', runs: 6 }));
+
+  it('shows FIFTY when a batter reaches 50, and not again on later balls, dismiss or undo+rescore', async () => {
+    const { store } = setup({ oversPerInnings: 10 });
+    seed(store, sixes);
+    await mount(store);
+    expect(screen.queryByTestId('milestone-celebration')).toBeNull();
+
+    await press('run-2');
+    expect(screen.getByTestId('milestone-celebration')).toBeTruthy();
+    expect(screen.getByText('FIFTY!')).toBeTruthy();
+    expect(screen.getByTestId('milestone-player')).toHaveTextContent('P-a1');
+    expect(screen.getByTestId('milestone-burst')).toBeTruthy();
+
+    await press('milestone-dismiss');
+    expect(screen.queryByTestId('milestone-celebration')).toBeNull();
+    await press('run-4');
+    expect(screen.queryByTestId('milestone-celebration')).toBeNull();
+
+    await press('undo');
+    await press('undo');
+    await press('run-2');
+    expect(screen.queryByTestId('milestone-celebration')).toBeNull();
+  });
+
+  it('shows a 3-FER when a bowler takes a third wicket', async () => {
+    const { store } = setup({ oversPerInnings: 10 });
+    seed(store, [
+      { striker: 'a1', non: 'a2', runs: 0, out: true },
+      { striker: 'a3', non: 'a2', runs: 0, out: true },
+    ]);
+    await mount(store);
+    await press('pick-a4');
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    expect(screen.getByText('3-FER!')).toBeTruthy();
+    expect(screen.getByTestId('milestone-player')).toHaveTextContent('P-b1');
+  });
+});

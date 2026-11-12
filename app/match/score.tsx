@@ -12,6 +12,7 @@ import { OverOrbs } from '../../src/components/OverOrbs';
 import { BallPad } from '../../src/features/scoring/BallPad';
 import { CreaseStrip } from '../../src/features/scoring/CreaseStrip';
 import { ExtrasSheet } from '../../src/features/scoring/ExtrasSheet';
+import { MilestoneCelebration } from '../../src/features/scoring/MilestoneCelebration';
 import { InningsBreak, PlayerPrompt } from '../../src/features/scoring/InningsBreak';
 import { ResultBanner } from '../../src/features/scoring/ResultBanner';
 import { WicketSheet } from '../../src/features/scoring/WicketSheet';
@@ -37,6 +38,14 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   const topBar = <ScreenHeader title={sc('scoringTitle')} />;
+  const celebration = v.milestone ? (
+    <MilestoneCelebration
+      key={v.milestone.key}
+      kind={v.milestone.kind}
+      playerName={v.milestone.playerName}
+      onDone={v.dismissMilestone}
+    />
+  ) : null;
 
   if (v.phase === 'none') {
     return (
@@ -75,6 +84,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
             onUndo={v.canUndo ? v.undo : undefined}
           />
         </ScrollView>
+        {celebration}
       </Screen>
     );
   }
@@ -180,6 +190,7 @@ export default function ScoreScreen({ store }: ScoreScreenProps) {
         onUndo={v.undo}
         hint={v.bowlerChoices.length === 0 ? sc('noBowlerShared') : v.capHint ? sc('capReached') : undefined}
       />
+      {celebration}
     </Screen>
   );
 }

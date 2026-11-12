@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import * as Haptics from 'expo-haptics';
 import {
@@ -14,6 +14,7 @@ import {
   currentInningsIndex,
   dismissedIds,
   isFreeHit,
+  lastBallMilestones,
   matchResult,
   target,
   teamTotal,
@@ -26,6 +27,7 @@ import type {
   ExtraType,
   MatchResult,
   MatchState,
+  MilestoneKind,
   Player,
   TeamConfig,
   WicketType,
@@ -77,19 +79,53 @@ export const scoringStrings = {
   noBatterShared: 'No batter available - every remaining player is out or already batting',
   keeper: 'Keeper',
   scoringTitle: 'Scoring',
+  milestoneFifty: 'FIFTY!',
+  milestoneCentury: 'HUNDRED!',
+  milestoneThreeWkts: '3-FER!',
+  milestoneFourWkts: '4-FER!',
+  milestoneFiveWkts: '5-FER!',
+  milestoneDismiss: 'Tap to dismiss',
 } as const;
+
+/** Hinglish overrides for the scoring copy; any missing key falls back to English. */
+export const scoringStringsHi: Partial<Record<keyof typeof scoringStrings, string>> = {
+  milestoneFifty: 'Fifty!',
+  milestoneCentury: 'Century!',
+  milestoneThreeWkts: '3 wicket!',
+  milestoneFourWkts: '4 wicket!',
+  milestoneFiveWkts: '5 wicket!',
+  milestoneDismiss: 'Band karne ke liye tap karo',
+};
 
 export type ScoringKey = keyof typeof scoringStrings;
 export type AnyKey = keyof Strings | ScoringKey;
 
+export const MILESTONE_KEY: Record<MilestoneKind, ScoringKey> = {
+  fifty: 'milestoneFifty',
+  century: 'milestoneCentury',
+  threeWkts: 'milestoneThreeWkts',
+  fourWkts: 'milestoneFourWkts',
+  fiveWkts: 'milestoneFiveWkts',
+};
+
+/** A milestone waiting to be (or being) celebrated. */
+export interface PendingMilestone {
+  key: string;
+  kind: MilestoneKind;
+  playerName: string;
+}
+
 export function useScoringT(): (key: AnyKey, vars?: Record<string, string | number>) => string {
-  const { t } = useT();
+  const { t, lang } = useT();
   return useCallback(
     (key, vars) => {
-      const raw = key in scoringStrings ? scoringStrings[key as ScoringKey] : t(key as keyof Strings);
+      const raw =
+        key in scoringStrings
+          ? ((lang === 'hi' ? scoringStringsHi[key as ScoringKey] : undefined) ?? scoringStrings[key as ScoringKey])
+          : t(key as keyof Strings);
       return vars ? format(raw, vars) : raw;
     },
-    [t],
+    [t, lang],
   );
 }
 
@@ -168,6 +204,9 @@ export interface ScoringView {
   byesEnabled: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  /** The milestone currently being celebrated (head of the queue), if any. */
+  milestone: PendingMilestone | null;
+  dismissMilestone(): void;
   submit(part: DeliveryPart): boolean;
   undo(): void;
   redo(): void;
@@ -256,6 +295,10 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   const [bowlerPick, setBowlerPick] = useState<{ inn: 0 | 1; id: string } | null>(null);
   const [batterPick, setBatterPick] = useState<string | null>(null);
 
+  const [milestones, setMilestones] = useState<PendingMilestone[]>([]);
+  // Keys already celebrated, so undo + re-score or a re-render never repeats a celebration.
+  const celebrated = useRef<Set<string>>(new Set());
+
   const decided = state ? matchResult(state).decided : false;
   useEffect(() => {
     if (decided) store.getState().finishMatch();
@@ -287,6 +330,8 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     byesEnabled: true,
     canUndo: false,
     canRedo: false,
+    milestone: null,
+    dismissMilestone: () => undefined,
     submit: () => false,
     undo: () => undefined,
     redo: () => undefined,
@@ -384,6 +429,8 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     byesEnabled: state.config.rules.byesEnabled,
     canUndo: state.events.length > 0,
     canRedo: state.redo.length > 0,
+    milestone: milestones[0] ?? null,
+    dismissMilestone: () => setMilestones((q) => q.slice(1)),
     submit(part) {
       // Re-derive from the live store so a rapid double-tap can't act on a stale render.
       const fresh = store.getState().state;
@@ -394,6 +441,17 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
       if ((t === 'bye' || t === 'legbye') && !fresh.config.rules.byesEnabled) return false;
       store.getState().delivery({ strikerId: cur.strikerId, nonStrikerId: cur.nonId, bowlerId: cur.bowlerId, ...part });
       setBatterPick(null);
+      const after = store.getState().state;
+      if (after) {
+        const found: PendingMilestone[] = [];
+        for (const m of lastBallMilestones(after)) {
+          const key = `${m.inningsIndex}:${m.kind}:${m.playerId}`;
+          if (celebrated.current.has(key)) continue;
+          celebrated.current.add(key);
+          found.push({ key, kind: m.kind, playerName: after.config.players[m.playerId]?.name ?? m.playerId });
+        }
+        if (found.length > 0) setMilestones((q) => [...q, ...found]);
+      }
       // The single haptic for a confirmed ball (pad buttons are silent).
       if (part.wicket) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       else if (part.runsBat === 4 || part.runsBat === 6) void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
@@ -402,6 +460,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
     },
     undo() {
       clearPick();
+      setMilestones([]);
       store.getState().undo();
     },
     redo() {
