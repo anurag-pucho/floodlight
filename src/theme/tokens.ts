@@ -10,6 +10,7 @@ export interface Colors {
   onPrimary: string;
   secondary: string;
   gold: string;
+  ballSeam: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
@@ -38,6 +39,7 @@ export const themes: Record<Scheme, ThemeTokens> = {
       onPrimary: '#0B0F0E',
       secondary: '#FF5A3C',
       gold: '#FFC53D',
+      ballSeam: '#FFE3DB',
       textPrimary: '#F3F6F4',
       textSecondary: '#9DA9A3',
       textMuted: '#67736D',
@@ -61,6 +63,7 @@ export const themes: Record<Scheme, ThemeTokens> = {
       onPrimary: '#10211B',
       secondary: '#E0391B',
       gold: '#B8860B',
+      ballSeam: '#FFE3DB',
       textPrimary: '#10211B',
       textSecondary: '#4A5A53',
       textMuted: '#7B8882',

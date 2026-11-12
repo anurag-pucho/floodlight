@@ -1,5 +1,6 @@
 import Svg, { Circle, Defs, Line, Path, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme } from '../theme/useTheme';
+import { useT } from '../i18n/useT';
 
 export interface CricketBallProps {
   size: number;
@@ -49,8 +50,9 @@ const RIGHT = seamGeometry(3, 8); // bulges right of centre
 /** Cricket ball in a 100x100 viewBox: leather body, soft shading, twin curved seams with stitches. */
 export function CricketBall({ size, color, seamColor }: CricketBallProps) {
   const { colors } = useTheme();
+  const { t } = useT();
   const body = color ?? colors.secondary;
-  const seam = seamColor ?? '#FFE3DB';
+  const seam = seamColor ?? colors.ballSeam;
   return (
     <Svg
       testID="cricket-ball-svg"
@@ -58,7 +60,7 @@ export function CricketBall({ size, color, seamColor }: CricketBallProps) {
       height={size}
       viewBox="0 0 100 100"
       accessibilityRole="image"
-      accessibilityLabel="Cricket ball"
+      accessibilityLabel={t('a11yCricketBall')}
     >
       <Defs>
         <RadialGradient id="ballShade" cx="35%" cy="30%" r="75%">

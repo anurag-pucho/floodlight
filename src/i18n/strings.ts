@@ -52,6 +52,10 @@ export interface Strings {
   theme: string;
   dark: string;
   light: string;
+  wicketGlyph: string;
+  a11yCricketBall: string;
+  a11yOverOrbs: string;
+  a11yScore: string;
 }
 
 export const en: Strings = {
@@ -106,6 +110,10 @@ export const en: Strings = {
   theme: 'Theme',
   dark: 'Night',
   light: 'Day',
+  wicketGlyph: 'W',
+  a11yCricketBall: 'Cricket ball',
+  a11yOverOrbs: 'Over: {balls} of {max} balls',
+  a11yScore: '{runs} for {wickets}, {overs} overs',
 };
 
 /** Hinglish (Latin script). Any missing key falls back to `en`. */
@@ -144,6 +152,10 @@ export const hi: Partial<Strings> = {
   language: 'Bhasha',
   dark: 'Raat',
   light: 'Din',
+  wicketGlyph: 'W',
+  a11yCricketBall: 'Cricket ball',
+  a11yOverOrbs: 'Over: {max} mein se {balls} ball',
+  a11yScore: '{runs} run, {wickets} wicket, {overs} over',
 };
 
 export const tables: Record<Lang, Partial<Strings>> = { en, hi };
@@ -154,4 +166,9 @@ export function translate(
   table: Partial<Strings> = tables[lang],
 ): string {
   return table[key] ?? en[key];
+}
+
+/** Replace `{name}` placeholders with values. */
+export function format(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }

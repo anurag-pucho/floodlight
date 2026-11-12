@@ -32,7 +32,7 @@ export function TapButton({
   style,
   testID,
 }: TapButtonProps) {
-  const { colors, radii, spacing, elevation } = useTheme();
+  const { colors, radii, spacing, elevation, typography } = useTheme();
   const scale = useSharedValue(1);
   const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -75,7 +75,7 @@ export function TapButton({
           style,
         ]}
       >
-        <Text variant="label" color={fg} style={{ fontSize: 16, lineHeight: 20 }}>
+        <Text variant="label" color={fg} style={{ fontSize: typography.body.fontSize, lineHeight: typography.body.lineHeight }}>
           {label}
         </Text>
       </Animated.View>

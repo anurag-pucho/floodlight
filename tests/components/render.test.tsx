@@ -1,3 +1,4 @@
+import { processColor } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 import type { ReactElement } from 'react';
 import { ThemeProvider } from '../../src/theme/ThemeProvider';
@@ -68,5 +69,26 @@ describe('Scoreboard', () => {
     expect(screen.getByTestId('scoreboard-runs')).toHaveTextContent('186');
     expect(screen.getByTestId('scoreboard-wickets')).toHaveTextContent('4');
     expect(screen.getByTestId('scoreboard-overs')).toHaveTextContent('18.3');
+  });
+});
+
+describe('OverOrbs color mapping and a11y', () => {
+  const kinds = ['dot', 'run', 'four', 'six', 'wicket', 'extra'] as const;
+  it('fills each outcome kind with its theme color', async () => {
+    const { themes } = require('../../src/theme/tokens') as typeof import('../../src/theme/tokens');
+    await wrap(<OverOrbs balls={kinds.map((kind) => ({ kind }))} />);
+    const orbs = screen.getAllByTestId('orb-filled');
+    kinds.forEach((kind, i) => {
+      expect(orbs[i].props.fill).toEqual({ payload: processColor(themes.dark.colors[kind]), type: 0 });
+    });
+  });
+  it('localizes accessibility labels with interpolation', async () => {
+    await wrap(<OverOrbs balls={[{ kind: 'four' }]} />);
+    expect(screen.getByLabelText('Over: 1 of 6 balls')).toBeTruthy();
+  });
+  it('uses the ballSeam token for the seam', async () => {
+    await wrap(<CricketBall size={60} />);
+    const { themes } = require('../../src/theme/tokens') as typeof import('../../src/theme/tokens');
+    expect(screen.getAllByTestId('cricket-ball-seam')[0].props.stroke).toEqual({ payload: processColor(themes.dark.colors.ballSeam), type: 0 });
   });
 });

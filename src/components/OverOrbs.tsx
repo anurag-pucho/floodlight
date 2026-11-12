@@ -7,6 +7,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../theme/useTheme';
+import { useT } from '../i18n/useT';
+import { format } from '../i18n/strings';
 import type { Colors } from '../theme/tokens';
 
 export interface BallGlyph {
@@ -35,13 +37,13 @@ const kindColor: Record<BallGlyph['kind'], keyof Colors> = {
   extra: 'extra',
 };
 
-function defaultLabel(b: BallGlyph): string {
+function defaultLabel(b: BallGlyph, wicketGlyph: string): string {
   if (b.label !== undefined) return b.label;
   switch (b.kind) {
     case 'dot':
       return '•';
     case 'wicket':
-      return 'W';
+      return wicketGlyph;
     case 'four':
       return '4';
     case 'six':
@@ -76,6 +78,7 @@ function FilledOrb({
 
 export function OverOrbs({ balls, max = 6, orbSize = 40 }: OverOrbsProps) {
   const { colors } = useTheme();
+  const { t } = useT();
   const r = orbSize / 2 - 2;
   const gap = orbSize * GAP_RATIO;
   const width = max * orbSize + (max - 1) * gap;
@@ -86,7 +89,7 @@ export function OverOrbs({ balls, max = 6, orbSize = 40 }: OverOrbsProps) {
       height={orbSize}
       viewBox={`0 0 ${width} ${orbSize}`}
       accessibilityRole="image"
-      accessibilityLabel={`Over: ${balls.length} of ${max} balls`}
+      accessibilityLabel={format(t('a11yOverOrbs'), { balls: balls.length, max })}
     >
       {Array.from({ length: max }, (_, i) => {
         const cx = orbSize / 2 + i * (orbSize + gap);
@@ -105,7 +108,7 @@ export function OverOrbs({ balls, max = 6, orbSize = 40 }: OverOrbsProps) {
             />
           );
         }
-        const label = defaultLabel(ball);
+        const label = defaultLabel(ball, t('wicketGlyph'));
         const darkText = ball.kind !== 'dot';
         return [
           <FilledOrb

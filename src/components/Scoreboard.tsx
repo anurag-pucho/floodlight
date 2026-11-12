@@ -10,6 +10,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useTheme } from '../theme/useTheme';
+import { useT } from '../i18n/useT';
+import { format } from '../i18n/strings';
 import { Text } from './Text';
 
 export interface ScoreboardProps {
@@ -23,6 +25,7 @@ export interface ScoreboardProps {
 /** LED-style hero readout. Monospace digits (Space Mono) so nothing shifts; runs count up on change. */
 export function Scoreboard({ runs, wickets, overs, size }: ScoreboardProps) {
   const { typography, spacing } = useTheme();
+  const { t } = useT();
   const [shown, setShown] = useState(runs);
   const value = useSharedValue(runs);
   const pop = useSharedValue(1);
@@ -51,7 +54,7 @@ export function Scoreboard({ runs, wickets, overs, size }: ScoreboardProps) {
   return (
     <View
       accessible
-      accessibilityLabel={`${runs} for ${wickets}, ${overs} overs`}
+      accessibilityLabel={format(t('a11yScore'), { runs, wickets, overs })}
       style={{ alignItems: 'flex-start' }}
     >
       <Animated.View
