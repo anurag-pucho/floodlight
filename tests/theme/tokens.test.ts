@@ -18,6 +18,10 @@ describe('tokens', () => {
     });
   }
 
+  it('dark and light define identical color keys', () => {
+    expect(Object.keys(themes.dark.colors).sort()).toEqual(Object.keys(themes.light.colors).sort());
+  });
+
   it('dark uses the exact brand values', () => {
     expect(themes.dark.colors.bg).toBe('#0B0F0E');
     expect(themes.dark.colors.primary).toBe('#B8FF3B');

@@ -58,7 +58,7 @@ export const themes: Record<Scheme, ThemeTokens> = {
       surfaceAlt: '#EEF2EF',
       hairline: 'rgba(16,33,27,0.10)',
       primary: '#4F9A00',
-      onPrimary: '#FFFFFF',
+      onPrimary: '#10211B',
       secondary: '#E0391B',
       gold: '#B8860B',
       textPrimary: '#10211B',
