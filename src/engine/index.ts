@@ -32,5 +32,5 @@ export {
   canSharedPlayerBat,
 } from './select';
 export type { TeamExtras, FallOfWicket, ChaseStatus, MatchResult } from './select';
-export { battingCard, bowlingCard, partnerships, manhattan, worm, runRate } from './select';
-export type { BattingRow, BowlingRow, Partnership } from './select';
+export { battingCard, bowlingCard, partnerships, manhattan, worm, runRate, lastBallMilestones } from './select';
+export type { BattingRow, BowlingRow, Partnership, Milestone, MilestoneKind } from './select';

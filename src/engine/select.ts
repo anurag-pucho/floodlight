@@ -404,3 +404,37 @@ export function runRate(state: MatchState, inningsIndex: 0 | 1): number {
   const legal = legalBallCount(state, inningsIndex);
   return legal === 0 ? 0 : teamTotal(state, inningsIndex) / (legal / BALLS_PER_OVER);
 }
+
+// ---------------------------------------------------------------------------
+// Milestones
+// ---------------------------------------------------------------------------
+
+export type MilestoneKind = 'fifty' | 'century' | 'threeWkts' | 'fourWkts' | 'fiveWkts';
+
+export interface Milestone { kind: MilestoneKind; playerId: string; inningsIndex: 0 | 1; }
+
+const WICKET_MILESTONES: Record<number, MilestoneKind> = { 3: 'threeWkts', 4: 'fourWkts', 5: 'fiveWkts' };
+
+/**
+ * Milestones caused by the most recent delivery only: a batter crossing 50 / 100 on this ball,
+ * or a bowler's wicket tally reaching exactly 3, 4 or 5. Compares the state with and without
+ * the last event, so it is deterministic under undo/redo.
+ */
+export function lastBallMilestones(state: MatchState): Milestone[] {
+  const last = state.events[state.events.length - 1];
+  if (!last) return [];
+  const before: MatchState = { ...state, events: state.events.slice(0, -1) };
+  const inn = last.inningsIndex;
+  const out: Milestone[] = [];
+  if (last.runsBat > 0) {
+    const was = batterRuns(before, last.strikerId, inn);
+    const now = was + last.runsBat;
+    if (was < 50 && now >= 50 && !(was < 100 && now >= 100)) out.push({ kind: 'fifty', playerId: last.strikerId, inningsIndex: inn });
+    if (was < 100 && now >= 100) out.push({ kind: 'century', playerId: last.strikerId, inningsIndex: inn });
+  }
+  if (last.wicket && last.wicket.type !== 'runout') {
+    const kind = WICKET_MILESTONES[bowlerWickets(state, last.bowlerId, inn)];
+    if (kind) out.push({ kind, playerId: last.bowlerId, inningsIndex: inn });
+  }
+  return out;
+}
