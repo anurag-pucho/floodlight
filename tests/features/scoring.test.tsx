@@ -296,7 +296,7 @@ describe('shared players and keeper', () => {
     expect(screen.getByTestId('pick-b2')).toBeTruthy();
   });
 
-  it('a shared player who has bowled this innings is not offered as a new batter', async () => {
+  it('a shared player who has bowled this innings IS offered as a new batter', async () => {
     const { store } = setup({ oversPerInnings: 3 }, withShared);
     await mount(store);
     await openInnings('a1', 'a2', 's1');
@@ -306,8 +306,21 @@ describe('shared players and keeper', () => {
     await press('wicket-type-bowled');
     await press('wicket-confirm');
     expect(screen.getByText('Select new batter')).toBeTruthy();
-    expect(screen.queryByTestId('pick-s1')).toBeNull();
+    expect(screen.getByTestId('pick-s1')).toBeTruthy();
     expect(screen.getByTestId('pick-a3')).toBeTruthy();
+  });
+
+  it('a shared player who is out is offered as a bowler again', async () => {
+    const { store } = setup({ oversPerInnings: 3 }, withShared);
+    await mount(store);
+    await openInnings('s1', 'a1', 'b1');
+    await press('wicket');
+    await press('wicket-type-bowled');
+    await press('wicket-confirm');
+    await press('pick-a2');
+    for (let i = 0; i < 5; i++) await press('run-0');
+    expect(screen.getByTestId('bowler-prompt')).toBeTruthy();
+    expect(screen.getByTestId('pick-s1')).toBeTruthy();
   });
 
   it('selecting stumped pre-fills the wicketkeeper as fielder', async () => {

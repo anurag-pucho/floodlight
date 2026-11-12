@@ -82,16 +82,26 @@ describe('shared player exclusivity', () => {
     const s = play(createMatch(makeConfig()), D('a1', 's1', 'b1', 0));
     expect(canSharedPlayerBowl(s, 's1', 0)).toBe(false);
   });
-  it('shared player who faced a ball (now out) cannot bowl; one who has not can', () => {
+  it('shared player who batted and is now out can bowl again; one who has not batted can too', () => {
     let s = play(createMatch(makeConfig()), D('s1', 'a1', 'b1', 0, { wicket: { type: 'bowled', outPlayerId: 's1' } }));
-    expect(canSharedPlayerBowl(s, 's1', 0)).toBe(false);
+    expect(canSharedPlayerBowl(s, 's1', 0)).toBe(true);
     s = play(createMatch(makeConfig()), D('a1', 'a2', 'b1', 0));
     expect(canSharedPlayerBowl(s, 's1', 0)).toBe(true);
   });
-  it('shared player who has bowled cannot bat', () => {
+  it('shared player who has bowled can still bat', () => {
     const s = play(createMatch(makeConfig()), D('a1', 'a2', 's1', 1));
-    expect(canSharedPlayerBat(s, 's1', 0)).toBe(false);
+    expect(canSharedPlayerBat(s, 's1', 0)).toBe(true);
     expect(canSharedPlayerBowl(s, 's1', 0)).toBe(true);
+  });
+  it('shared player cannot bowl while at the crease, then can after being out', () => {
+    let s = play(createMatch(makeConfig()), D('a1', 's1', 'b1', 0));
+    expect(canSharedPlayerBowl(s, 's1', 0)).toBe(false);
+    s = play(s, D('a1', 's1', 'b1', 0, { wicket: { type: 'bowled', outPlayerId: 's1' } }));
+    expect(canSharedPlayerBowl(s, 's1', 0)).toBe(true);
+  });
+  it('shared player who is out cannot bat again', () => {
+    const s = play(createMatch(makeConfig()), D('s1', 'a1', 'b1', 0, { wicket: { type: 'bowled', outPlayerId: 's1' } }));
+    expect(canSharedPlayerBat(s, 's1', 0)).toBe(false);
   });
 });
 

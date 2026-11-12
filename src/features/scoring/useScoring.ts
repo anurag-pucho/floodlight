@@ -73,8 +73,8 @@ export const scoringStrings = {
   byeShort: 'B',
   legByeShort: 'Lb',
   striker: 'Striker',
-  noBowlerShared: 'No bowler available - shared players cannot bowl while batting',
-  noBatterShared: 'No batter available - shared players cannot bat after bowling',
+  noBowlerShared: 'No bowler available - shared players cannot bowl while at the crease',
+  noBatterShared: 'No batter available - every remaining player is out or already batting',
   keeper: 'Keeper',
   scoringTitle: 'Scoring',
 } as const;
@@ -329,7 +329,7 @@ export function useScoring(store: ScoringStore = matchStore): ScoringView {
   );
   const cap = state.config.rules.maxOversPerBowler;
   const fielders = squadPlayers(state, field);
-  // A shared player who is batting this innings cannot also bowl.
+  // A shared player currently at the crease cannot also bowl (simultaneity only).
   const bowlable = fielders.filter((p) => canSharedPlayerBowl(state, p.id, inn));
   const eligible = bowlable.filter(
     (p) => p.id !== last?.bowlerId && (cap === undefined || bowlerOversBowled(state, p.id, inn) < cap),

@@ -195,18 +195,17 @@ export function isSharedPlayer(config: MatchConfig, playerId: string): boolean {
   return shared(config.teamA) && shared(config.teamB);
 }
 
-/** A shared player who is at the crease or has faced a ball this innings cannot also bowl. */
+/** Simultaneity guard: a shared player currently at the crease (not out) cannot bowl. */
 export function canSharedPlayerBowl(state: MatchState, playerId: string, inningsIndex: 0 | 1): boolean {
   if (!isSharedPlayer(state.config, playerId)) return true;
   const crease = creaseFor(state, inningsIndex);
-  if (crease.strikerId === playerId || crease.nonStrikerId === playerId) return false;
-  return !inningsEvents(state, inningsIndex).some(e => e.strikerId === playerId && e.extra?.type !== 'wide');
+  return crease.strikerId !== playerId && crease.nonStrikerId !== playerId;
 }
 
-/** A shared player who has bowled a delivery this innings cannot also bat. */
+/** A shared player may bat unless already out this innings (bowling earlier does not block batting). */
 export function canSharedPlayerBat(state: MatchState, playerId: string, inningsIndex: 0 | 1): boolean {
   if (!isSharedPlayer(state.config, playerId)) return true;
-  return !inningsEvents(state, inningsIndex).some(e => e.bowlerId === playerId);
+  return !dismissedIds(state, inningsIndex).has(playerId);
 }
 
 /** Target for the chasing side: innings-0 total + 1, once innings 0 is complete. */
