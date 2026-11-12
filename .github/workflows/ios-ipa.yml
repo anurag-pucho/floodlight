@@ -45,18 +45,23 @@ jobs:
         run: |
           cd ios
           WS=$(ls -d *.xcworkspace | head -1)
-          xcodebuild \
-            -workspace "$WS" \
-            -scheme "${{ steps.scheme.outputs.name }}" \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath "$PWD/build/App.xcarchive" \
-            archive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            PROVISIONING_PROFILE="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+          archive() {
+            xcodebuild \
+              -workspace "$WS" \
+              -scheme "${{ steps.scheme.outputs.name }}" \
+              -configuration Release \
+              -sdk iphoneos \
+              -archivePath "$PWD/build/App.xcarchive" \
+              archive \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              PROVISIONING_PROFILE="" \
+              AD_HOC_CODE_SIGNING_ALLOWED=YES
+          }
+          # Expo macro "scan-modules" has a 5s deadline that flakes on cold runners.
+          # Retry up to 3x; the macro binary is warm by then.
+          archive || { echo "=== archive retry 1 ==="; archive; } || { echo "=== archive retry 2 ==="; archive; }
 
       - name: Package unsigned .ipa
         run: |
