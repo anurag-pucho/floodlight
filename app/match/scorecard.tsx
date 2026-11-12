@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { currentInningsIndex, teamTotal, wicketsDown } from '../../src/engine';
 import { useMatchStore } from '../../src/store/matchStore';
 import { Screen } from '../../src/components/Screen';
+import { ScreenHeader } from '../../src/components/ScreenHeader';
 import { Surface } from '../../src/components/Surface';
 import { Text } from '../../src/components/Text';
 import { useTheme } from '../../src/theme/useTheme';
@@ -36,7 +37,7 @@ export default function ScorecardScreen() {
 
   if (!state) {
     return (
-      <Screen>
+      <Screen header={<ScreenHeader title={s('title')} />}>
         <Text variant="body" color="textSecondary">{s('noMatch')}</Text>
       </Screen>
     );
@@ -49,11 +50,8 @@ export default function ScorecardScreen() {
   const battingTeam = idx === 0 ? first : second;
 
   return (
-    <Screen>
-      <ScrollView contentContainerStyle={{ gap: spacing.lg, paddingVertical: spacing.lg }}>
-        <Text variant="label" color="primary" style={{ letterSpacing: 2 }}>
-          {s('title').toUpperCase()}
-        </Text>
+    <Screen header={<ScreenHeader title={`${cfg.teamA.name} vs ${cfg.teamB.name}`} />}>
+      <View style={{ gap: spacing.lg }}>
         <InningsSwitcher value={idx} onChange={setSelected} labels={[first.name, second.name]} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <Text variant="heading" testID="innings-heading">{`${battingTeam.name} · ${t('innings')} ${idx + 1}`}</Text>
@@ -73,7 +71,7 @@ export default function ScorecardScreen() {
           <Text variant="label" color="primary">{s('chartsTitle')}</Text>
           <Text variant="caption" color="textSecondary">{s('chartsSoon')}</Text>
         </Surface>
-      </ScrollView>
+      </View>
     </Screen>
   );
 }

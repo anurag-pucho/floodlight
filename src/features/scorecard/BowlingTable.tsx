@@ -1,11 +1,12 @@
 import { View } from 'react-native';
-import { bowlingCard } from '../../engine';
+import { bowlingCard, bowlingSide } from '../../engine';
 import type { MatchState } from '../../engine';
 import { Text } from '../../components/Text';
 import { useTheme } from '../../theme/useTheme';
 import { useT } from '../../i18n/useT';
 import { Cell, NUM_COL } from './Cell';
 import { useScorecardT } from './useScorecardT';
+import { NameWithRoles } from './RoleTag';
 
 const NARROW = 32;
 
@@ -14,6 +15,7 @@ export function BowlingTable({ state, inningsIndex }: { state: MatchState; innin
   const { t } = useT();
   const s = useScorecardT();
   const rows = bowlingCard(state, inningsIndex);
+  const side = bowlingSide(state, inningsIndex);
   const row = { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs } as const;
   return (
     <View testID="bowling-table">
@@ -35,7 +37,14 @@ export function BowlingTable({ state, inningsIndex }: { state: MatchState; innin
           testID={`bowl-row-${r.playerId}`}
           style={[row, { borderTopWidth: 1, borderTopColor: colors.hairline }]}
         >
-          <Cell>{state.config.players[r.playerId]?.name ?? r.playerId}</Cell>
+          <View style={{ flex: 1 }}>
+            <NameWithRoles
+              config={state.config}
+              side={side}
+              playerId={r.playerId}
+              name={state.config.players[r.playerId]?.name ?? r.playerId}
+            />
+          </View>
           <Cell numeric width={NUM_COL}>{r.overs}</Cell>
           <Cell numeric width={NARROW}>{r.maidens}</Cell>
           <Cell numeric width={NUM_COL}>{r.runs}</Cell>

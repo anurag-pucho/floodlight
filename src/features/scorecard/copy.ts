@@ -20,6 +20,8 @@ export interface ScorecardCopy {
   colWd: string;
   colNb: string;
   notOut: string;
+  captainTag: string;
+  keeperTag: string;
   extrasDetail: string;
   fallOfWickets: string;
   fowEntry: string;
@@ -53,6 +55,8 @@ const en: ScorecardCopy = {
   colWd: 'Wd',
   colNb: 'Nb',
   notOut: 'not out',
+  captainTag: '(C)',
+  keeperTag: '(WK)',
   extrasDetail: 'b {b}, lb {lb}, w {w}, nb {nb}',
   fallOfWickets: 'Fall of wickets',
   fowEntry: '{no}-{score} ({name}, {over} ov)',

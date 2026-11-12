@@ -1,17 +1,19 @@
 import { View } from 'react-native';
-import { battingCard } from '../../engine';
+import { battingCard, battingSide } from '../../engine';
 import type { MatchState } from '../../engine';
 import { Text } from '../../components/Text';
 import { useTheme } from '../../theme/useTheme';
 import { useT } from '../../i18n/useT';
 import { Cell, NUM_COL } from './Cell';
 import { useScorecardT } from './useScorecardT';
+import { NameWithRoles } from './RoleTag';
 
 export function BattingTable({ state, inningsIndex }: { state: MatchState; inningsIndex: 0 | 1 }) {
   const { spacing, colors } = useTheme();
   const { t } = useT();
   const s = useScorecardT();
   const rows = battingCard(state, inningsIndex);
+  const side = battingSide(state, inningsIndex);
   const row = { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingVertical: spacing.xs } as const;
   return (
     <View testID="batting-table">
@@ -33,7 +35,7 @@ export function BattingTable({ state, inningsIndex }: { state: MatchState; innin
             style={[row, { borderTopWidth: 1, borderTopColor: colors.hairline }]}
           >
             <View style={{ flex: 1 }}>
-              <Text variant="label">{name}</Text>
+              <NameWithRoles config={state.config} side={side} playerId={r.playerId} name={name} />
               <Text variant="caption" color={r.out ? 'wicket' : 'textSecondary'}>
                 {r.out ? r.dismissal ?? t('out') : s('notOut')}
               </Text>
