@@ -23,6 +23,13 @@ export {
   chaseStatus,
   matchResult,
   needsSuperOver,
+  battingSide,
+  bowlingSide,
+  teamCaptainId,
+  teamWicketkeeperId,
+  isSharedPlayer,
+  canSharedPlayerBowl,
+  canSharedPlayerBat,
 } from './select';
 export type { TeamExtras, FallOfWicket, ChaseStatus, MatchResult } from './select';
 export { battingCard, bowlingCard, partnerships, manhattan, worm, runRate } from './select';

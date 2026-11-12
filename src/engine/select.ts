@@ -1,4 +1,4 @@
-import { BallRecord, MatchState } from './types';
+import { BallRecord, MatchConfig, MatchState } from './types';
 import { BALLS_PER_OVER, ballBowlerRuns, ballTotalRuns, runsRun } from './rules';
 
 export function currentInningsIndex(state: MatchState): 0 | 1 {
@@ -24,7 +24,11 @@ export function legalBallsInCurrentOver(state: MatchState): number {
  * delivery); a dismissed batter's slot is '' until that replacement is supplied.
  */
 export function batsmenAtCrease(state: MatchState): { strikerId: string; nonStrikerId: string } {
-  const events = inningsEvents(state, currentInningsIndex(state));
+  return creaseFor(state, currentInningsIndex(state));
+}
+
+function creaseFor(state: MatchState, inningsIndex: 0 | 1): { strikerId: string; nonStrikerId: string } {
+  const events = inningsEvents(state, inningsIndex);
   let striker = '';
   let non = '';
   let legal = 0;
@@ -168,9 +172,41 @@ export function bowlerConceded(state: MatchState, bowlerId: string, inningsIndex
     .reduce((sum, e) => sum + ballBowlerRuns(e, state.config.rules), 0);
 }
 
-function battingSide(state: MatchState, inningsIndex: 0 | 1): 'A' | 'B' {
+export function battingSide(state: MatchState, inningsIndex: 0 | 1): 'A' | 'B' {
   const first = state.config.battingFirst;
   return inningsIndex === 0 ? first : first === 'A' ? 'B' : 'A';
+}
+
+export function bowlingSide(state: MatchState, inningsIndex: 0 | 1): 'A' | 'B' {
+  return battingSide(state, inningsIndex) === 'A' ? 'B' : 'A';
+}
+
+export function teamCaptainId(config: MatchConfig, side: 'A' | 'B'): string | undefined {
+  return (side === 'A' ? config.teamA : config.teamB).players.find(p => p.isCaptain)?.playerId;
+}
+
+export function teamWicketkeeperId(config: MatchConfig, side: 'A' | 'B'): string | undefined {
+  return (side === 'A' ? config.teamA : config.teamB).players.find(p => p.isWicketkeeper)?.playerId;
+}
+
+/** True when the player is marked shared in BOTH squads. */
+export function isSharedPlayer(config: MatchConfig, playerId: string): boolean {
+  const shared = (t: MatchConfig['teamA']) => t.players.some(p => p.playerId === playerId && p.isShared);
+  return shared(config.teamA) && shared(config.teamB);
+}
+
+/** A shared player who is at the crease or has faced a ball this innings cannot also bowl. */
+export function canSharedPlayerBowl(state: MatchState, playerId: string, inningsIndex: 0 | 1): boolean {
+  if (!isSharedPlayer(state.config, playerId)) return true;
+  const crease = creaseFor(state, inningsIndex);
+  if (crease.strikerId === playerId || crease.nonStrikerId === playerId) return false;
+  return !inningsEvents(state, inningsIndex).some(e => e.strikerId === playerId && e.extra?.type !== 'wide');
+}
+
+/** A shared player who has bowled a delivery this innings cannot also bat. */
+export function canSharedPlayerBat(state: MatchState, playerId: string, inningsIndex: 0 | 1): boolean {
+  if (!isSharedPlayer(state.config, playerId)) return true;
+  return !inningsEvents(state, inningsIndex).some(e => e.bowlerId === playerId);
 }
 
 /** Target for the chasing side: innings-0 total + 1, once innings 0 is complete. */
@@ -227,7 +263,10 @@ function dismissalText(state: MatchState, e: BallRecord): string {
   const w = e.wicket;
   if (!w) return '';
   const bowler = playerName(state, e.bowlerId);
-  const fielder = w.fielderId ? playerName(state, w.fielderId) : '';
+  const keeperId = teamWicketkeeperId(state.config, bowlingSide(state, e.inningsIndex));
+  const isKeeper = w.fielderId !== undefined && w.fielderId === keeperId
+    && (w.type === 'caught' || w.type === 'stumped');
+  const fielder = w.fielderId ? `${isKeeper ? '†' : ''}${playerName(state, w.fielderId)}` : '';
   switch (w.type) {
     case 'bowled': return `b ${bowler}`;
     case 'lbw': return `lbw b ${bowler}`;

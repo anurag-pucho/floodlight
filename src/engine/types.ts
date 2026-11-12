@@ -10,7 +10,7 @@ export interface MatchRules {
   byesEnabled: boolean;
   maxOversPerBowler?: number;
 }
-export interface SquadPlayer { playerId: string; isShared: boolean; }
+export interface SquadPlayer { playerId: string; isShared: boolean; isCaptain?: boolean; isWicketkeeper?: boolean; }
 export interface TeamConfig { id: string; name: string; color: string; players: SquadPlayer[]; }
 export interface MatchConfig {
   id: string;
